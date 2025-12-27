@@ -1,4 +1,5 @@
 use ropey::Rope;
+use std::fmt;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
@@ -16,6 +17,18 @@ pub struct Document {
     text: Rope,
 }
 
+impl Default for Document {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for Document {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.text)
+    }
+}
+
 impl Document {
     pub fn new() -> Self {
         Self { text: Rope::new() }
@@ -26,10 +39,6 @@ impl Document {
         let reader = BufReader::new(file);
         let text = Rope::from_reader(reader)?;
         Ok(Self { text })
-    }
-
-    pub fn to_string(&self) -> String {
-        self.text.to_string()
     }
 
     // Create a viewing window (start line, end line)
