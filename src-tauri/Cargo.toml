@@ -1,0 +1,40 @@
+[package]
+name = "kern"
+version = "0.1.0"
+license = "MIT"
+edition = "2024"
+
+[dependencies]
+kern-core = { version = "0.1.0", path = "../kern-core" }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0"
+portable-pty = "0.8"
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-shell = "2"
+
+# Phase 2: Advanced Features
+walkdir = "2"
+ignore = "0.4"
+fuzzy-matcher = "0.3"
+notify = "6"
+lsp-types = "0.95"
+tokio = { version = "1", features = ["process", "io-util", "sync", "fs"] }
+rayon = "1.8"
+grep-searcher = "0.1"
+grep-regex = "0.1"
+
+# Phase 3: Extension Management
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+sha2 = "0.10"
+zip = "2.2"
+dirs = "5"
+hex = "0.4"
+chrono = "0.4"
+
+# Phase 7: Vibe Panel Production
+tauri-plugin-store = "2"
+futures-util = "0.3"
+[build-dependencies]
+tauri-build = { version = "2", features = [] }

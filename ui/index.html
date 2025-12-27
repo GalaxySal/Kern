@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kern Editor</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+
+<body class="bg-gray-950 text-gray-200 overflow-hidden font-mono antialiased">
+  <div id="app" class="flex flex-col h-screen w-screen bg-[#1e1e1e]">
+    <!-- Menu Bar -->
+    <div
+      class="flex items-center px-2 h-8 bg-[#1e1e1e] text-[13px] select-none text-[#cccccc] space-x-0 border-b border-[#333] z-50"
+      id="menubar">
+      <div class="flex items-center px-2 h-full font-bold text-blue-400 mr-2">
+        <img src="/icon.png" class="w-5 h-5 mr-2" alt="Kern">
+      </div>
+
+      <!-- Menu Item: File -->
+      <div class="relative menu-container h-full">
+        <div class="menu-btn px-3 h-full flex items-center hover:bg-[#3c3c3c] cursor-pointer rounded-sm"
+          data-menu="file">File</div>
+        <ul id="dropdown-file"
+          class="menu-dropdown hidden absolute top-full left-0 w-64 bg-[#252526] border border-[#454545] shadow-xl py-1 z-50 text-[#cccccc]">
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-new-file">
+            <span>New Text File</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+N</span>
+          </li>
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-open-file">
+            <span>Open File...</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+O</span>
+          </li>
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-open-folder">
+            <span>Open Folder...</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+K Ctrl+O</span>
+          </li>
+          <li class="h-px bg-[#454545] my-1"></li>
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-save-file">
+            <span>Save</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+S</span>
+          </li>
+          <li class="h-px bg-[#454545] my-1"></li>
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer" id="action-exit">Exit</li>
+        </ul>
+      </div>
+
+      <!-- Menu Item: Edit -->
+      <div class="relative menu-container h-full">
+        <div class="menu-btn px-3 h-full flex items-center hover:bg-[#3c3c3c] cursor-pointer rounded-sm"
+          data-menu="edit">Edit</div>
+        <ul id="dropdown-edit"
+          class="menu-dropdown hidden absolute top-full left-0 w-56 bg-[#252526] border border-[#454545] shadow-xl py-1 z-50 text-[#cccccc]">
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-undo">
+            <span>Undo</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+Z</span>
+          </li>
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-redo">
+            <span>Redo</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+Y</span>
+          </li>
+          <li class="h-px bg-[#454545] my-1"></li>
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-cut">
+            <span>Cut</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+X</span>
+          </li>
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-copy">
+            <span>Copy</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+C</span>
+          </li>
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-paste">
+            <span>Paste</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+V</span>
+          </li>
+          <li class="h-px bg-[#454545] my-1"></li>
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-find">
+            <span>Find</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+F</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Menu Item: Selection -->
+      <div class="relative menu-container h-full">
+        <div class="menu-btn px-3 h-full flex items-center hover:bg-[#3c3c3c] cursor-pointer rounded-sm"
+          data-menu="selection">Selection</div>
+        <ul id="dropdown-selection"
+          class="menu-dropdown hidden absolute top-full left-0 w-64 bg-[#252526] border border-[#454545] shadow-xl py-1 z-50 text-[#cccccc]">
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-select-all">
+            <span>Select All</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+A</span>
+          </li>
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-expand-select">
+            <span>Expand Selection</span> <span
+              class="text-xs text-gray-500 group-hover:text-white">Shift+Alt+Right</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Menu Item: View -->
+      <div class="relative menu-container h-full">
+        <div class="menu-btn px-3 h-full flex items-center hover:bg-[#3c3c3c] cursor-pointer rounded-sm"
+          data-menu="view">View</div>
+        <ul id="dropdown-view"
+          class="menu-dropdown hidden absolute top-full left-0 w-64 bg-[#252526] border border-[#454545] shadow-xl py-1 z-50 text-[#cccccc]">
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-toggle-sidebar">
+            <span>Toggle Sidebar</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+B</span>
+          </li>
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-toggle-panel">
+            <span>Toggle Panel</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+J</span>
+          </li>
+          <li class="h-px bg-[#454545] my-1"></li>
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-zoom-in">
+            <span>Zoom In</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+=</span>
+          </li>
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-zoom-out">
+            <span>Zoom Out</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+-</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Menu Item: Go -->
+      <div class="relative menu-container h-full">
+        <div class="menu-btn px-3 h-full flex items-center hover:bg-[#3c3c3c] cursor-pointer rounded-sm" data-menu="go">
+          Go</div>
+        <ul id="dropdown-go"
+          class="menu-dropdown hidden absolute top-full left-0 w-56 bg-[#252526] border border-[#454545] shadow-xl py-1 z-50 text-[#cccccc]">
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-go-file">
+            <span>Go to File...</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+P</span>
+          </li>
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-go-line">
+            <span>Go to Line/Column...</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+G</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Menu Item: Run -->
+      <div class="relative menu-container h-full">
+        <div class="menu-btn px-3 h-full flex items-center hover:bg-[#3c3c3c] cursor-pointer rounded-sm"
+          data-menu="run">Run</div>
+        <ul id="dropdown-run"
+          class="menu-dropdown hidden absolute top-full left-0 w-64 bg-[#252526] border border-[#454545] shadow-xl py-1 z-50 text-[#cccccc]">
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-run-task">
+            <span>Run Task...</span>
+          </li>
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-start-debug">
+            <span>Start Debugging</span> <span class="text-xs text-gray-500 group-hover:text-white">F5</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Menu Item: Terminal -->
+      <div class="relative menu-container h-full">
+        <div class="menu-btn px-3 h-full flex items-center hover:bg-[#3c3c3c] cursor-pointer rounded-sm"
+          data-menu="terminal">Terminal</div>
+        <ul id="dropdown-terminal"
+          class="menu-dropdown hidden absolute top-full left-0 w-64 bg-[#252526] border border-[#454545] shadow-xl py-1 z-50 text-[#cccccc]">
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-new-terminal">
+            <span>New Terminal</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+Shift+`</span>
+          </li>
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group"
+            id="action-split-terminal">
+            <span>Split Terminal</span> <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+\</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Menu Item: Help -->
+      <div class="relative menu-container h-full">
+        <div class="menu-btn px-3 h-full flex items-center hover:bg-[#3c3c3c] cursor-pointer rounded-sm"
+          data-menu="help">Help</div>
+        <ul id="dropdown-help"
+          class="menu-dropdown hidden absolute top-full left-0 w-48 bg-[#252526] border border-[#454545] shadow-xl py-1 z-50 text-[#cccccc]">
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer" id="action-welcome">Welcome</li>
+          <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer" id="action-about">About Kern</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Command Palette Modal (Ctrl+P) -->
+    <div id="command-palette"
+      class="hidden fixed inset-0 z-[100] flex items-start justify-center pt-[10vh] bg-black/50">
+      <div class="w-[600px] max-w-[90vw] bg-[#1e1e1e] rounded-md shadow-2xl border border-[#454545] overflow-hidden">
+        <div class="flex items-center px-3 py-2 border-b border-[#454545]">
+          <span class="text-gray-400 mr-2">🔍</span>
+          <input id="palette-input" type="text" placeholder="Type to search files..."
+            class="flex-1 bg-transparent border-none outline-none text-white text-sm placeholder-gray-500" autofocus>
+          <span class="text-gray-500 text-xs ml-2">Esc to close</span>
+        </div>
+        <div id="palette-results" class="max-h-80 overflow-y-auto">
+          <div class="text-gray-500 text-sm p-4 text-center">Type to start searching...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Extensions Marketplace Modal -->
+    <div id="marketplace-modal"
+      class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div
+        class="w-[800px] max-w-[95vw] max-h-[85vh] bg-[#1e1e1e]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[#454545] overflow-hidden flex flex-col">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-[#454545]">
+          <div class="flex items-center space-x-3">
+            <span class="text-2xl">🧩</span>
+            <h2 class="text-xl font-bold text-white">Extensions Marketplace</h2>
+          </div>
+          <button id="close-marketplace" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+        </div>
+
+        <!-- Search -->
+        <div class="px-6 py-3 border-b border-[#454545]">
+          <input id="marketplace-search" type="text" placeholder="Search extensions..."
+            class="w-full px-4 py-2 bg-[#2d2d2d] border border-[#454545] rounded-lg text-white placeholder-gray-500 outline-none focus:border-[#007acc]">
+        </div>
+
+        <!-- Extensions Grid -->
+        <div id="marketplace-grid" class="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="text-gray-500 text-center py-8">Loading extensions...</div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-3 border-t border-[#454545] flex justify-between items-center text-sm text-gray-500">
+          <span id="installed-count">0 installed</span>
+          <div class="flex items-center gap-2">
+            <button id="show-installed-only"
+              class="px-3 py-1 bg-[#2d2d2d] hover:bg-[#3d3d3d] rounded text-gray-400 hover:text-white">
+              Show Installed Only
+            </button>
+            <button id="publish-extension-btn"
+              class="px-3 py-1 bg-[#007acc] hover:bg-[#0088dd] rounded text-white font-medium">
+              ➕ Publish Extension
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Permission Dialog Modal -->
+    <div id="permission-dialog"
+      class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div class="w-[450px] max-w-[90vw] bg-[#1e1e1e] rounded-xl shadow-2xl border border-[#454545] overflow-hidden">
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-[#454545] bg-gradient-to-r from-[#007acc]/20 to-transparent">
+          <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+            <span>🔐</span>
+            <span>Permission Request</span>
+          </h3>
+          <p id="permission-ext-name" class="text-sm text-gray-400 mt-1">Extension Name</p>
+        </div>
+
+        <!-- Permissions List -->
+        <div class="px-6 py-4">
+          <p class="text-gray-300 mb-4">This extension requests the following permissions:</p>
+          <ul id="permission-list" class="space-y-2">
+            <!-- Permissions will be inserted here -->
+          </ul>
+        </div>
+
+        <!-- Actions -->
+        <div class="px-6 py-4 border-t border-[#454545] flex justify-end space-x-3">
+          <button id="permission-cancel" class="px-4 py-2 bg-[#3d3d3d] hover:bg-[#4d4d4d] text-white rounded-lg">
+            Cancel
+          </button>
+          <button id="permission-allow"
+            class="px-4 py-2 bg-[#007acc] hover:bg-[#0088dd] text-white rounded-lg font-medium">
+            Allow & Install
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="flex flex-1 overflow-hidden">
+      <!-- Sidebar -->
+      <aside id="sidebar" class="w-64 bg-[#252526] border-r border-[#333] flex flex-col">
+        <div
+          class="p-2 border-b border-[#333] flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-widest pl-4">
+          EXPLORER
+          <button id="open-dir-btn" class="hover:text-white" title="Open Folder">
+            📂
+          </button>
+        </div>
+        <div id="file-tree" class="flex-1 p-2 overflow-y-auto text-sm font-sans">
+          <div class="text-gray-500 italic p-2 text-center text-xs">No folder opened</div>
+        </div>
+      </aside>
+
+      <!-- Editor Area -->
+      <main class="flex-1 relative bg-gray-950 overflow-hidden flex flex-col">
+        <div id="editor-container" class="flex-1 w-full relative"></div>
+
+        <!-- Terminal Area -->
+        <div id="terminal-panel"
+          class="h-48 w-full bg-[#1e1e1e] border-t border-[#333] flex flex-col transition-all duration-200 ease-in-out">
+          <!-- Tabs Header -->
+          <div class="flex justify-between items-center px-4 h-9 bg-[#1e1e1e] border-b border-[#333] select-none">
+            <div class="flex space-x-1 h-full" id="terminal-tabs">
+              <div id="tab-problems"
+                class="px-2 h-full flex items-center text-xs text-gray-500 hover:text-gray-300 cursor-pointer uppercase tracking-wide border-b border-transparent">
+                Problems</div>
+              <div id="tab-output"
+                class="px-2 h-full flex items-center text-xs text-gray-500 hover:text-gray-300 cursor-pointer uppercase tracking-wide border-b border-transparent">
+                Output</div>
+              <div id="tab-debug"
+                class="px-2 h-full flex items-center text-xs text-gray-500 hover:text-gray-300 cursor-pointer uppercase tracking-wide border-b border-transparent">
+                Debug Console</div>
+              <div id="tab-terminal"
+                class="px-2 h-full flex items-center text-xs text-gray-200 cursor-pointer uppercase tracking-wide font-medium border-b border-white">
+                Terminal</div>
+              <div id="tab-ports"
+                class="px-2 h-full flex items-center text-xs text-gray-500 hover:text-gray-300 cursor-pointer uppercase tracking-wide border-b border-transparent">
+                Ports</div>
+            </div>
+            <!-- Toolbar -->
+            <div class="flex items-center space-x-3 text-gray-400">
+              <button id="btn-term-new" class="hover:text-white" title="New Terminal">＋</button>
+              <button id="btn-term-split" class="hover:text-white" title="Split Terminal">◫</button>
+              <button id="btn-term-kill" class="hover:text-white" title="Kill Terminal">🗑</button>
+              <button id="btn-term-max" class="hover:text-white" title="Maximize Panel">^</button>
+              <button id="btn-term-close" class="hover:text-white" title="Close Panel">✕</button>
+            </div>
+          </div>
+          <!-- Content Containers -->
+          <div id="panel-content-terminal" class="flex-1 w-full bg-[#1e1e1e] pl-2 pt-1 overflow-hidden h-full"></div>
+
+          <!-- Problems Panel -->
+          <div id="panel-content-problems" class="hidden flex-1 w-full bg-[#1e1e1e] overflow-auto">
+            <table class="w-full text-left border-collapse">
+              <thead class="bg-[#252526] text-xs text-gray-400 sticky top-0">
+                <tr>
+                  <th class="px-4 py-1 font-normal w-16">Code</th>
+                  <th class="px-4 py-1 font-normal">Message</th>
+                  <th class="px-4 py-1 font-normal w-24">File</th>
+                  <th class="px-4 py-1 font-normal w-16">Ln, Col</th>
+                </tr>
+              </thead>
+              <tbody id="problems-table-body" class="text-xs font-mono text-gray-300">
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
+            <div id="problems-empty" class="p-4 text-gray-500 text-xs italic">No problems detected in the workspace.
+            </div>
+          </div>
+
+          <!-- Output Panel -->
+          <div id="panel-content-output"
+            class="hidden flex-1 w-full bg-[#1e1e1e] p-2 overflow-auto font-mono text-xs text-gray-300 whitespace-pre-wrap select-text">
+          </div>
+
+          <!-- Debug Console -->
+          <div id="panel-content-debug" class="hidden flex-1 w-full bg-[#1e1e1e] flex flex-col p-2">
+            <div id="debug-output"
+              class="flex-1 overflow-auto font-mono text-xs text-gray-300 whitespace-pre-wrap mb-2"></div>
+            <div class="flex items-center border-t border-[#333] pt-2">
+              <span class="text-blue-400 mr-2">➜</span>
+              <input id="debug-input" type="text"
+                class="flex-1 bg-transparent border-none outline-none text-gray-200 font-mono text-xs"
+                placeholder="Evaluate expression...">
+            </div>
+          </div>
+
+          <!-- Ports Panel -->
+          <div id="panel-content-ports" class="hidden flex-1 w-full bg-[#1e1e1e] overflow-auto">
+            <table class="w-full text-left border-collapse">
+              <thead class="bg-[#252526] text-xs text-gray-400 sticky top-0">
+                <tr>
+                  <th class="px-4 py-1 font-normal w-24">Port</th>
+                  <th class="px-4 py-1 font-normal">Protocol</th>
+                  <th class="px-4 py-1 font-normal">Process</th>
+                  <th class="px-4 py-1 font-normal">Local Address</th>
+                </tr>
+              </thead>
+              <tbody class="text-xs font-mono text-gray-300">
+                <tr class="hover:bg-[#2a2d2e]">
+                  <td class="px-4 py-1 text-blue-400 underline cursor-pointer"
+                    onclick="window.open('http://localhost:5173')">5173</td>
+                  <td class="px-4 py-1">http</td>
+                  <td class="px-4 py-1">Vite Server</td>
+                  <td class="px-4 py-1">localhost:5173</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <footer
+          class="h-6 bg-[#007acc] text-white flex items-center justify-between px-2 text-[11px] select-none z-50 transition-colors duration-200"
+          id="status-bar-container">
+          <!-- Left Section -->
+          <div class="flex items-center h-full space-x-4">
+            <div class="flex items-center space-x-1 hover:bg-[#ffffff20] px-1 h-full cursor-pointer" title="Git Branch">
+              <span class="icon-git-branch">master*</span>
+            </div>
+            <div class="flex items-center space-x-1 px-1 h-full cursor-pointer hover:bg-[#ffffff20]"
+              id="toggle-vibe-btn" title="Toggle Vibe AI">
+              <span class="text-xs">✨</span> <span class="font-bold">Vibe</span>
+            </div>
+            <div class="flex items-center space-x-3 hover:bg-[#ffffff20] px-1 h-full cursor-pointer"
+              id="status-diagnostics" title="No Problems">
+              <div class="flex items-center space-x-1">
+                <span class="text-white">⊗</span> <span id="status-err-count">0</span>
+              </div>
+              <div class="flex items-center space-x-1">
+                <span class="text-white">⚠</span> <span id="status-warn-count">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Section -->
+          <div class="flex items-center h-full space-x-4">
+            <div class="hover:bg-[#ffffff20] px-2 h-full flex items-center cursor-pointer" id="status-cursor">Ln 1, Col
+              1</div>
+            <div class="hover:bg-[#ffffff20] px-2 h-full flex items-center cursor-pointer" id="status-indent">Spaces: 4
+            </div>
+            <div class="hover:bg-[#ffffff20] px-2 h-full flex items-center cursor-pointer" id="status-encoding">UTF-8
+            </div>
+            <div class="hover:bg-[#ffffff20] px-2 h-full flex items-center cursor-pointer" id="status-eol">LF</div>
+            <div class="hover:bg-[#ffffff20] px-2 h-full flex items-center cursor-pointer" id="status-lang">{ }
+              JavaScript</div>
+            <div class="hover:bg-[#ffffff20] px-2 h-full flex items-center cursor-pointer" title="Tweet Feedback">
+              <span class="text-xs">🔔</span>
+            </div>
+          </div>
+        </footer>
+      </main>
+
+      <!-- Vibe AI Panel -->
+      <aside id="vibe-panel"
+        class="hidden w-[350px] bg-[#1e1e1e] border-l border-[#333] flex-col transition-all duration-300 z-[100]">
+        <div
+          class="p-2 border-b border-[#333] flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-widest pl-4">
+          <span>✨ Vibe Assistant</span>
+          <div class="flex items-center space-x-2">
+            <button id="vibe-settings-btn" class="hover:text-white" title="AI Settings">⚙️</button>
+            <button id="close-vibe-btn" class="hover:text-white" title="Close Panel">✕</button>
+          </div>
+        </div>
+
+        <!-- Settings View (Hidden by default) -->
+        <div id="vibe-settings-view"
+          class="hidden p-4 space-y-4 bg-[#252526] border-b border-[#333] text-sm overflow-y-auto max-h-[60%]">
+          <div class="space-y-2">
+            <label class="text-gray-400 text-[10px] uppercase font-bold">Model Provider</label>
+            <select id="vibe-model-select"
+              class="w-full bg-[#1e1e1e] border border-[#333] rounded p-1 text-white outline-none">
+              <optgroup label="Cloud Models (Best Quality)">
+                <option value="gemini-3-pro-preview">Gemini 3 Pro (Preview)</option>
+                <option value="gemini-3-flash-preview">Gemini 3 Flash (Preview)</option>
+                <option value="claude-4-sonnet-20251015">Claude 4 Sonnet</option>
+                <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                <option value="gpt-4o">GPT-4o</option>
+                <option value="gpt-5">GPT-5 (Preview)</option>
+              </optgroup>
+              <optgroup label="Local Models (Ollama)">
+                <option value="ollama">Ollama (Custom Local)</option>
+                <option value="qwen2.5-coder">Qwen 2.5 Coder</option>
+                <option value="llama3.1">Llama 3.1 8B</option>
+              </optgroup>
+              <option value="custom">Custom Model ID...</option>
+            </select>
+          </div>
+          <div id="vibe-custom-model-container" class="space-y-2 hidden">
+            <label class="text-gray-400 text-[10px] uppercase font-bold">Custom Model ID</label>
+            <input type="text" id="vibe-custom-model-id" placeholder="e.g. gpt-4-turbo"
+              class="w-full bg-[#1e1e1e] border border-[#333] rounded p-1 text-white outline-none">
+          </div>
+          <div class="space-y-2">
+            <label class="text-gray-400 text-[10px] uppercase font-bold">API Keys</label>
+            <div class="space-y-2">
+              <input type="password" id="key-openai" placeholder="OpenAI / DeepSeek Key"
+                class="w-full bg-[#1e1e1e] border border-[#333] rounded p-1 text-white outline-none">
+              <input type="password" id="key-anthropic" placeholder="Anthropic Key"
+                class="w-full bg-[#1e1e1e] border border-[#333] rounded p-1 text-white outline-none">
+              <input type="password" id="key-gemini" placeholder="Gemini Key"
+                class="w-full bg-[#1e1e1e] border border-[#333] rounded p-1 text-white outline-none">
+            </div>
+            <button id="save-vibe-settings"
+              class="w-full bg-[#007acc] text-white py-1 rounded hover:bg-[#0062a3] transition-colors mt-2">Save
+              Keys</button>
+          </div>
+          <div class="text-[10px] text-gray-500 italic">Keys are stored securely in your local app data folder.</div>
+        </div>
+
+        <div id="vibe-chat-history"
+          class="flex-1 overflow-y-auto p-4 space-y-4 text-sm font-sans flex flex-col custom-scrollbar">
+          <div class="bg-[#2d2d2d] rounded-lg p-3 text-gray-300">
+            Hi! I'm Vibe. Enter your API key in settings to start vibing. ✨
+          </div>
+        </div>
+        <div class="p-4 border-t border-[#333]">
+          <div class="relative">
+            <textarea id="vibe-input"
+              class="w-full bg-[#2d2d2d] border border-[#454545] rounded-lg p-3 text-sm text-white placeholder-gray-500 outline-none focus:border-[#007acc] resize-none"
+              placeholder="Type your vibe..." rows="3"></textarea>
+            <button id="vibe-send-btn"
+              class="absolute bottom-3 right-3 text-blue-400 hover:text-white transition-colors">
+              ⏎
+            </button>
+          </div>
+        </div>
+      </aside>
+    </div> <!-- End Main Layout -->
+  </div> <!-- End App -->
+  <script type="module" src="./main.js"></script>
+</body>
+
+</html>

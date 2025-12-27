@@ -1,0 +1,20 @@
+{
+    "identifier": "default",
+    "description": "Default permissions for the app",
+    "local": true,
+    "windows": [
+        "main"
+    ],
+    "permissions": [
+        "core:default",
+        "core:event:default",
+        "core:event:allow-listen",
+        "core:event:allow-emit",
+        "shell:default",
+        "store:default",
+        "store:allow-get",
+        "store:allow-set",
+        "store:allow-load",
+        "store:allow-save"
+    ]
+}
