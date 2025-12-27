@@ -55,4 +55,4 @@ jobs:
           releaseBody: 'See the assets below for the latest version of Kern Editor.'
           releaseDraft: true
           prerelease: false
-          projectPath: ./ui # The directory containing package.json for the tauri build command
+          projectPath: . # Using root package.json for standard layout

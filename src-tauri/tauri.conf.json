@@ -3,8 +3,8 @@
     "version": "0.1.0",
     "identifier": "com.kern.editor",
     "build": {
-        "beforeDevCommand": "npm run dev",
-        "beforeBuildCommand": "npm run build",
+        "beforeDevCommand": "npm run dev --prefix ui",
+        "beforeBuildCommand": "npm run build --prefix ui",
         "devUrl": "http://127.0.0.1:5173",
         "frontendDist": "../ui/dist"
     },

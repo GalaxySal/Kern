@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "tauri": "cd .. && ui/node_modules/.bin/tauri"
+    "tauri": "tauri"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.9.6",
