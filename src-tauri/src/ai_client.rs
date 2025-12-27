@@ -33,7 +33,7 @@ fn get_api_key(app: &AppHandle, provider: &str) -> Option<String> {
     let store = StoreBuilder::new(app, store_path).build().ok()?;
     store
         .get(provider)
-        .and_then(|v: serde_json::Value| v.as_str().map(|s: &str| s.to_string()))
+        .and_then(|v: serde_json::Value| v.as_str().map(|s| s.to_owned()))
 }
 
 #[tauri::command]
@@ -49,21 +49,19 @@ pub async fn stream_vibe_chat(
     let store = StoreBuilder::new(&app_handle, store_path.clone())
         .build()
         .ok();
-    if model_id == "custom" || model_id == "ollama" {
-        if let Some(s) = &store {
-            if let Some(custom_id) = s
-                .get("custom_model_id")
-                .and_then(|v| v.as_str().map(|s| s.to_string()))
-            {
-                model_id = custom_id;
-            } else if model_id == "ollama" {
-                return Err(
-                    "Ollama selected but no model name provided in 'Custom Model ID' field."
-                        .to_string(),
-                );
-            } else {
-                return Err("Custom Model ID selected but none provided in Settings.".to_string());
-            }
+
+    if let Some(s) = store.as_ref().filter(|_| model_id == "custom" || model_id == "ollama") {
+        if let Some(custom_id) = s
+            .get("custom_model_id")
+            .and_then(|v| v.as_str().map(|s| s.to_owned()))
+        {
+            model_id = custom_id;
+        } else if model_id == "ollama" {
+            return Err(
+                "Ollama selected but no model name provided in 'Custom Model ID' field.".to_owned(),
+            );
+        } else {
+            return Err("Custom Model ID selected but none provided in Settings.".to_owned());
         }
     }
 
@@ -83,7 +81,7 @@ pub async fn stream_vibe_chat(
     }; // Fallback to OpenAI compatible
 
     let api_key = if provider == "ollama" {
-        "".to_string() // Ollama typically doesn't need a key locally
+        String::new() // Ollama typically doesn't need a key locally
     } else {
         get_api_key(&app_handle, provider)
             .ok_or_else(|| format!("API key for {} not found in Settings.", provider))?

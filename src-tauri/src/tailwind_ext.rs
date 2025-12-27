@@ -72,31 +72,29 @@ fn parse_theme_block(css_content: &str) -> Vec<TailwindCompletion> {
     // Format: --color-primary: #007acc;
     for line in theme_content.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("--") {
-            if let Some(colon_pos) = trimmed.find(':') {
-                let var_name = trimmed[..colon_pos].trim();
-                let var_value = trimmed[colon_pos + 1..].trim().trim_end_matches(';');
+        if let Some(colon_pos) = trimmed.find(':').filter(|_| trimmed.starts_with("--")) {
+            let var_name = trimmed[..colon_pos].trim();
+            let var_value = trimmed[colon_pos + 1..].trim().trim_end_matches(';');
 
-                // Convert --color-primary to color-primary (Tailwind class name)
-                let class_name = var_name.trim_start_matches("--");
+            // Convert --color-primary to color-primary (Tailwind class name)
+            let class_name = var_name.trim_start_matches("--");
 
-                // Determine kind based on name
-                let kind = if class_name.contains("color") || class_name.contains("bg") {
-                    "color"
-                } else if class_name.contains("spacing") || class_name.contains("size") {
-                    "spacing"
-                } else {
-                    "custom"
-                };
+            // Determine kind based on name
+            let kind = if class_name.contains("color") || class_name.contains("bg") {
+                "color"
+            } else if class_name.contains("spacing") || class_name.contains("size") {
+                "spacing"
+            } else {
+                "custom"
+            };
 
-                completions.push(TailwindCompletion {
-                    label: class_name.to_string(),
-                    kind: kind.to_string(),
-                    detail: format!("var({}) → {}", var_name, var_value),
-                    insert_text: class_name.to_string(),
-                    priority: 1000, // Custom vars get highest priority
-                });
-            }
+            completions.push(TailwindCompletion {
+                label: class_name.to_string(),
+                kind: kind.to_string(),
+                detail: format!("var({}) → {}", var_name, var_value),
+                insert_text: class_name.to_string(),
+                priority: 1000, // Custom vars get highest priority
+            });
         }
     }
 
@@ -116,19 +114,11 @@ fn scan_css_files(root: &Path) -> Vec<TailwindCompletion> {
         .max_depth(Some(10))
         .build();
 
-    for result in walker {
-        if let Ok(entry) = result {
-            let path = entry.path();
-            if path.is_file() {
-                if let Some(ext) = path.extension() {
-                    if ext == "css" {
-                        if let Ok(content) = std::fs::read_to_string(path) {
-                            let mut file_completions = parse_theme_block(&content);
-                            all_completions.append(&mut file_completions);
-                        }
-                    }
-                }
-            }
+    for entry in walker.flatten() {
+        let path = entry.path();
+        if let Some(content) = std::fs::read_to_string(path).ok().filter(|_| path.is_file() && path.extension().is_some_and(|ext| ext == "css")) {
+            let mut file_completions = parse_theme_block(&content);
+            all_completions.append(&mut file_completions);
         }
     }
 
@@ -381,10 +371,10 @@ fn get_default_utilities() -> Vec<TailwindCompletion> {
     utilities
         .into_iter()
         .map(|(label, detail, priority)| TailwindCompletion {
-            label: label.to_string(),
-            kind: "utility".to_string(),
-            detail: detail.to_string(),
-            insert_text: label.to_string(),
+            label: label.to_owned(),
+            kind: "utility".to_owned(),
+            detail: detail.to_owned(),
+            insert_text: label.to_owned(),
             priority,
         })
         .collect()

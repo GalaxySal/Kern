@@ -214,12 +214,12 @@ fn get_git_branch(cwd: String) -> String {
         Ok(o) => {
             let stdout = String::from_utf8_lossy(&o.stdout).trim().to_string();
             if stdout.is_empty() {
-                "".to_string()
+                String::new()
             } else {
                 stdout
             }
         }
-        Err(_) => "".to_string(),
+        Err(_) => String::new(),
     }
 }
 
@@ -263,20 +263,18 @@ fn open_project(root: String) -> Result<ProjectNode, String> {
     // Collect all entries into a flat list first
     let mut entries: Vec<(String, String, bool)> = Vec::new();
 
-    for result in walker {
-        if let Ok(entry) = result {
-            let path = entry.path();
-            let path_str = path.to_string_lossy().to_string();
-            let name = path
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_else(|| path_str.clone());
-            let is_dir = path.is_dir();
+    for entry in walker.flatten() {
+        let path = entry.path();
+        let path_str = path.to_string_lossy().to_string();
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| path_str.clone());
+        let is_dir = path.is_dir();
 
-            // Skip root itself
-            if path_str != root {
-                entries.push((name, path_str, is_dir));
-            }
+        // Skip root itself
+        if path_str != root {
+            entries.push((name, path_str, is_dir));
         }
     }
 
@@ -317,7 +315,7 @@ fn open_project(root: String) -> Result<ProjectNode, String> {
             children,
         };
 
-        node_map.entry(parent).or_insert_with(Vec::new).push(node);
+        node_map.entry(parent).or_default().push(node);
     }
 
     // Get root children and sort them
@@ -349,19 +347,17 @@ fn search_files(query: String, root: String, limit: usize) -> Vec<(String, Strin
         .git_ignore(true)
         .build();
 
-    for result in walker {
-        if let Ok(entry) = result {
-            let path = entry.path();
-            if path.is_file() {
-                let name = path
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_default();
+    for entry in walker.flatten() {
+        let path = entry.path();
+        if path.is_file() {
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
 
-                if let Some(score) = matcher.fuzzy_match(&name, &query) {
-                    let path_str = path.to_string_lossy().to_string();
-                    results.push((name, path_str, score));
-                }
+            if let Some(score) = matcher.fuzzy_match(&name, &query) {
+                let path_str = path.to_string_lossy().to_string();
+                results.push((name, path_str, score));
             }
         }
     }
@@ -399,39 +395,40 @@ fn search_content(query: String, root: String, limit: usize) -> Vec<ContentMatch
         .git_ignore(true)
         .build();
 
-    'outer: for entry_result in walker {
-        if let Ok(entry) = entry_result {
-            let path = entry.path();
-            if path.is_file() {
-                // Skip binary files (simple check by extension)
-                let ext = path
-                    .extension()
-                    .map(|e| e.to_string_lossy().to_lowercase())
-                    .unwrap_or_default();
+    'outer: for entry in walker.flatten() {
+        let path = entry.path();
+        if path.is_file() {
+            // Skip binary files (simple check by extension)
+            let ext = path
+                .extension()
+                .map(|e| e.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
 
-                let skip_exts = [
-                    "png", "jpg", "jpeg", "gif", "ico", "woff", "woff2", "ttf", "eot", "pdf",
-                    "zip", "tar", "gz", "exe", "dll", "so", "dylib", "node",
-                ];
-                if skip_exts.contains(&ext.as_str()) {
-                    continue;
-                }
+            let skip_exts = [
+                "png", "jpg", "jpeg", "gif", "ico", "woff", "woff2", "ttf", "eot", "pdf",
+                "zip", "tar", "gz", "exe", "dll", "so", "dylib", "node",
+            ];
+            if skip_exts.contains(&ext.as_str()) {
+                continue;
+            }
 
-                if let Ok(file) = File::open(path) {
-                    let reader = BufReader::new(file);
-                    for (line_num, line_result) in reader.lines().enumerate() {
-                        if let Ok(line) = line_result {
-                            if line.to_lowercase().contains(&query_lower) {
-                                results.push(ContentMatch {
-                                    path: path.to_string_lossy().to_string(),
-                                    line_number: line_num + 1,
-                                    line_content: line.chars().take(200).collect(), // Limit line length
-                                });
+            if let Ok(file) = File::open(path) {
+                let reader = BufReader::new(file);
+                for (line_num, line_result) in reader.lines().enumerate() {
+                    let line = match line_result {
+                        Ok(l) => l,
+                        Err(_) => continue,
+                    };
 
-                                if results.len() >= limit.min(500) {
-                                    break 'outer;
-                                }
-                            }
+                    if line.to_lowercase().contains(&query_lower) {
+                        results.push(ContentMatch {
+                            path: path.to_string_lossy().to_string(),
+                            line_number: line_num + 1,
+                            line_content: line.chars().take(200).collect(), // Limit line length
+                        });
+
+                        if results.len() >= limit.min(500) {
+                            break 'outer;
                         }
                     }
                 }
