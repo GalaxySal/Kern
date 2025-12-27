@@ -1,6 +1,6 @@
 {
     "productName": "kern",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "identifier": "com.kern.editor",
     "build": {
         "beforeDevCommand": "npm run dev --prefix ui",

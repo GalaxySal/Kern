@@ -426,8 +426,7 @@ pub async fn sync_settings(app_handle: AppHandle, action: String) -> Result<Stri
             .json()
             .await
             .map_err(|e| format!("Parse failed: {}", e))?;
-        if let Some(row) = data.first() {
-            if let Some(settings) = row["settings"].as_object() {
+        if let Some(settings) = data.first().and_then(|row| row["settings"].as_object()) {
                 for (key, val) in settings {
                     let store = StoreBuilder::new(&app_handle, store_path.clone())
                         .build()
