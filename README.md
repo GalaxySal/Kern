@@ -7,22 +7,26 @@ Kern is a high-performance, ultra-lightweight code editor built with **Rust**, *
 ## 🧩 Key Features
 
 ### 1. Extension Marketplace
+
 - **Secure by Design**: All extensions are verified via **SHA256 checksums** before installation.
 - **Permission System**: Explicit user consent for file system, network, and terminal access.
 - **Supabase Integration**: Backed by Supabase for real-time extension listings, ratings, and download counts.
 - **Sandboxed Execution**: Sidecar path guards restrict native binary extensions to their own directories.
 
 ### 🎨 Tailwind v4 IntelliSense (Built-in)
+
 - **CSS @theme Parser**: Automatically scans project CSS files for custom property definitions.
 - **Real-time Monitoring**: Asynchronous file watcher (`notify`) updates completions the moment you save your CSS.
 - **Monaco Provider**: Native autocompletion for `class` and `className` attributes with custom variable prioritization.
 
 ### 🔍 Advanced Search & Navigation
+
 - **Command Palette (Ctrl+P)**: Fast, fuzzy search through thousands of files.
 - **Content Grep**: High-speed content search powered by Rust's `grep-searcher`.
 - **Project Watcher**: Automatically reflects file system changes in the explorer tree.
 
 ### 💻 Integrated Terminal
+
 - Full-featured terminal emulator using `portable-pty` and `xterm.js`.
 - Tabbed interface with session management.
 
@@ -41,14 +45,17 @@ Kern is a high-performance, ultra-lightweight code editor built with **Rust**, *
 ## 🚀 Getting Started
 
 ### Prerequisites
+
 - **Rust** (latest stable)
 - **Node.js** (v20+)
 - **OS Dependencies** (Linux):
-  ```bash
-  sudo apt install libwebkit2gtk-4.0-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-  ```
+
+```bash
+sudo apt install libwebkit2gtk-4.0-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+```
 
 ### Running for Development
+
 ```bash
 # Clone and enter directory
 cd kern
@@ -65,11 +72,11 @@ npm run tauri dev
 ## ⌨️ Shortcuts
 
 | Shortcut | Action |
-|----------|--------|
+| --- | --- |
 | `Ctrl + P` | Command Palette (Search Files) |
 | `Ctrl + Shift + X` | Extensions Marketplace |
 | `Ctrl + S` | Save File |
-| `Ctrl + ` ` (Backtick) | Toggle Terminal |
+| `Ctrl + \`` | Toggle Terminal |
 | `Ctrl + \` | Toggle Sidebar |
 
 ---
@@ -106,4 +113,3 @@ We welcome community contributions! You can publish your own extensions by click
 ## 📜 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
