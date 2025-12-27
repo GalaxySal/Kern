@@ -360,20 +360,32 @@ pub async fn sync_settings(app_handle: AppHandle, action: String) -> Result<Stri
     let client = reqwest::Client::new();
     // In a real app, we'd use the user's session token here.
     // For this prototype, we'll sync by "default_user" or a provided ID.
-    
+
     if action == "push" {
         // Collect all settings
         let mut settings = json!({});
-        for key in ["openai", "anthropic", "gemini", "deepseek", "custom_model_id"] {
+        for key in [
+            "openai",
+            "anthropic",
+            "gemini",
+            "deepseek",
+            "custom_model_id",
+        ] {
             if let Some(val) = store.get(key) {
                 settings[key] = val.clone();
             }
         }
 
         let response = client
-            .post(format!("{}/rest/v1/user_settings?on_conflict=user_id", crate::extension_manager::SUPABASE_URL))
+            .post(format!(
+                "{}/rest/v1/user_settings?on_conflict=user_id",
+                crate::extension_manager::SUPABASE_URL
+            ))
             .header("apikey", crate::extension_manager::SUPABASE_ANON_KEY)
-            .header("Authorization", format!("Bearer {}", crate::extension_manager::SUPABASE_ANON_KEY))
+            .header(
+                "Authorization",
+                format!("Bearer {}", crate::extension_manager::SUPABASE_ANON_KEY),
+            )
             .header("Prefer", "resolution=merge-duplicates")
             .json(&json!({
                 "user_id": "default_user",
@@ -392,9 +404,15 @@ pub async fn sync_settings(app_handle: AppHandle, action: String) -> Result<Stri
     } else {
         // action == "pull"
         let response = client
-            .get(format!("{}/rest/v1/user_settings?user_id=eq.default_user&select=settings", crate::extension_manager::SUPABASE_URL))
+            .get(format!(
+                "{}/rest/v1/user_settings?user_id=eq.default_user&select=settings",
+                crate::extension_manager::SUPABASE_URL
+            ))
             .header("apikey", crate::extension_manager::SUPABASE_ANON_KEY)
-            .header("Authorization", format!("Bearer {}", crate::extension_manager::SUPABASE_ANON_KEY))
+            .header(
+                "Authorization",
+                format!("Bearer {}", crate::extension_manager::SUPABASE_ANON_KEY),
+            )
             .send()
             .await
             .map_err(|e| format!("Pull failed: {}", e))?;
@@ -404,7 +422,10 @@ pub async fn sync_settings(app_handle: AppHandle, action: String) -> Result<Stri
             return Err(format!("Supabase error: {}", body));
         }
 
-        let data: Vec<serde_json::Value> = response.json().await.map_err(|e| format!("Parse failed: {}", e))?;
+        let data: Vec<serde_json::Value> = response
+            .json()
+            .await
+            .map_err(|e| format!("Parse failed: {}", e))?;
         if let Some(row) = data.first() {
             if let Some(settings) = row["settings"].as_object() {
                 for (key, val) in settings {
@@ -420,4 +441,3 @@ pub async fn sync_settings(app_handle: AppHandle, action: String) -> Result<Stri
         Err("No settings found in cloud for this user.".to_owned())
     }
 }
-
