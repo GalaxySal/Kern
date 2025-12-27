@@ -427,15 +427,14 @@ pub async fn sync_settings(app_handle: AppHandle, action: String) -> Result<Stri
             .await
             .map_err(|e| format!("Parse failed: {}", e))?;
         if let Some(settings) = data.first().and_then(|row| row["settings"].as_object()) {
-                for (key, val) in settings {
-                    let store = StoreBuilder::new(&app_handle, store_path.clone())
-                        .build()
-                        .map_err(|e| format!("Store build failed: {}", e))?;
-                    store.set(key.clone(), val.clone());
-                    store.save().map_err(|e| format!("Save failed: {}", e))?;
-                }
-                return Ok("Settings restored from cloud.".to_owned());
+            for (key, val) in settings {
+                let store = StoreBuilder::new(&app_handle, store_path.clone())
+                    .build()
+                    .map_err(|e| format!("Store build failed: {}", e))?;
+                store.set(key.clone(), val.clone());
+                store.save().map_err(|e| format!("Save failed: {}", e))?;
             }
+            return Ok("Settings restored from cloud.".to_owned());
         }
         Err("No settings found in cloud for this user.".to_owned())
     }
