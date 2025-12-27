@@ -40,6 +40,12 @@ jobs:
           npm install
           npm install --prefix ui
 
+      - name: Get Version
+        id: version
+        shell: bash
+        run: |
+          echo "val=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
       - name: Generate Changelog
         id: changelog
         shell: bash
@@ -53,10 +59,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Kern v${{ github.ref_name }}'
+          tagName: v${{ steps.version.outputs.val }}
+          releaseName: 'Kern v${{ steps.version.outputs.val }}'
           releaseBody: |
-            ## What's Changed
+            ## What's Changed in v${{ steps.version.outputs.val }}
             ${{ steps.changelog.outputs.content }}
             
             ---
