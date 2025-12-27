@@ -7,9 +7,11 @@
     "scripts": {
         "dev": "npm run dev --prefix ui",
         "build": "npm run build --prefix ui",
+        "lint": "echo 'No global lint yet'",
         "tauri": "npx tauri"
     },
     "devDependencies": {
-        "@tauri-apps/cli": "^2.9.6"
+        "@tauri-apps/cli": "^2.9.6",
+        "eslint": "^9.0.0"
     }
 }
