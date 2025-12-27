@@ -1,0 +1,16 @@
+# Kern Build & Release Configuration
+# This project uses GitHub Actions for automated cross-platform releases.
+# The functional workflow is located at: .github/workflows/release.yml
+
+platforms:
+  - windows
+  - macos
+  - linux
+
+release_trigger:
+  - push_tag: v*
+
+instructions: |
+  1. Tag your commit: git tag -a v0.1.0 -m "Release v0.1.0"
+  2. Push the tag: git push origin v0.1.0
+  3. GitHub Actions will build and create a Draft Release.
