@@ -488,7 +488,19 @@
               class="w-full bg-[#007acc] text-white py-1 rounded hover:bg-[#0062a3] transition-colors mt-2">Save
               Keys</button>
           </div>
-          <div class="text-[10px] text-gray-500 italic">Keys are stored securely in your local app data folder.</div>
+          <div class="flex items-center space-x-2 pt-2 border-t border-[#333]">
+            <button id="vibe-push-settings"
+              class="flex-1 bg-[#2d2d2d] text-gray-300 py-1 rounded hover:bg-[#3d3d3d] transition-colors flex items-center justify-center space-x-1"
+              title="Backup settings to Supabase">
+              <span>☁️</span> <span>Backup</span>
+            </button>
+            <button id="vibe-pull-settings"
+              class="flex-1 bg-[#2d2d2d] text-gray-300 py-1 rounded hover:bg-[#3d3d3d] transition-colors flex items-center justify-center space-x-1"
+              title="Restore settings from Supabase">
+              <span>🔄</span> <span>Restore</span>
+            </button>
+          </div>
+          <div class="text-[10px] text-gray-500 italic text-center">Cloud sync is powered by Supabase.</div>
         </div>
 
         <div id="vibe-chat-history"

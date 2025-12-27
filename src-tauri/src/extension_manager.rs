@@ -11,8 +11,8 @@ use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 
 // Supabase configuration - will be loaded from environment
-const SUPABASE_URL: &str = "https://osgtltgosztvivcnltsw.supabase.co";
-const SUPABASE_ANON_KEY: &str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ3RsdGdvc3p0dml2Y25sdHN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3NDYzMzQsImV4cCI6MjA4MjMyMjMzNH0.DFD2-1stdrJFgEnHcaVSj_YtROhySl_ige_gdAQ8LUM";
+pub const SUPABASE_URL: &str = "https://osgtltgosztvivcnltsw.supabase.co";
+pub const SUPABASE_ANON_KEY: &str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ3RsdGdvc3p0dml2Y25sdHN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3NDYzMzQsImV4cCI6MjA4MjMyMjMzNH0.DFD2-1stdrJFgEnHcaVSj_YtROhySl_ige_gdAQ8LUM";
 
 /// Extension metadata from Supabase
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -307,6 +307,14 @@ pub fn list_installed_extensions() -> Result<Vec<InstalledExtension>, ExtensionE
 /// Install an extension (mock implementation for development)
 #[tauri::command]
 pub async fn install_extension(extension: Extension) -> Result<InstalledExtension, ExtensionError> {
+    // Enforcement: Admin-approved (official) plugins only rule [2025-12-26]
+    if !extension.is_official {
+        return Err(ExtensionError {
+            code: "NOT_OFFICIAL".to_string(),
+            message: "Security Policy: Only admin-approved (official) extensions can be installed in this version.".to_string(),
+        });
+    }
+
     let ext_dir = get_extensions_dir()?;
     let ext_path = ext_dir.join(&extension.id);
 

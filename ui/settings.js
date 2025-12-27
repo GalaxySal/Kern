@@ -56,4 +56,25 @@ export async function initSettings(appState) {
         alert('Settings saved!');
         settingsView.classList.add('hidden');
     });
+
+    document.getElementById('vibe-push-settings').addEventListener('click', async () => {
+        try {
+            const result = await window.__TAURI__.core.invoke('sync_settings', { action: 'push' });
+            alert(result);
+        } catch (err) {
+            alert('Push failed: ' + err);
+        }
+    });
+
+    document.getElementById('vibe-pull-settings').addEventListener('click', async () => {
+        if (!confirm('This will overwrite your local keys. Continue?')) return;
+        try {
+            const result = await window.__TAURI__.core.invoke('sync_settings', { action: 'pull' });
+            alert(result);
+            // Reload page to refresh settings in memory
+            window.location.reload();
+        } catch (err) {
+            alert('Pull failed: ' + err);
+        }
+    });
 }

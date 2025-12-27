@@ -348,3 +348,76 @@ pub async fn apply_code_change(
     fs::write(path, code).map_err(|e| format!("Failed to write file: {}", e))?;
     Ok(())
 }
+
+/// Sync user settings with Supabase
+#[tauri::command]
+pub async fn sync_settings(app_handle: AppHandle, action: String) -> Result<String, String> {
+    let store_path = PathBuf::from("settings.json");
+    let store = StoreBuilder::new(&app_handle, store_path.clone())
+        .build()
+        .map_err(|e| format!("Store build failed: {}", e))?;
+
+    let client = reqwest::Client::new();
+    // In a real app, we'd use the user's session token here.
+    // For this prototype, we'll sync by "default_user" or a provided ID.
+    
+    if action == "push" {
+        // Collect all settings
+        let mut settings = json!({});
+        for key in ["openai", "anthropic", "gemini", "deepseek", "custom_model_id"] {
+            if let Some(val) = store.get(key) {
+                settings[key] = val.clone();
+            }
+        }
+
+        let response = client
+            .post(format!("{}/rest/v1/user_settings?on_conflict=user_id", crate::extension_manager::SUPABASE_URL))
+            .header("apikey", crate::extension_manager::SUPABASE_ANON_KEY)
+            .header("Authorization", format!("Bearer {}", crate::extension_manager::SUPABASE_ANON_KEY))
+            .header("Prefer", "resolution=merge-duplicates")
+            .json(&json!({
+                "user_id": "default_user",
+                "settings": settings,
+                "updated_at": chrono::Utc::now().to_rfc3339()
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("Push failed: {}", e))?;
+
+        if !response.status().is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(format!("Supabase error: {}", body));
+        }
+        Ok("Settings successfully backed up to cloud.".to_owned())
+    } else {
+        // action == "pull"
+        let response = client
+            .get(format!("{}/rest/v1/user_settings?user_id=eq.default_user&select=settings", crate::extension_manager::SUPABASE_URL))
+            .header("apikey", crate::extension_manager::SUPABASE_ANON_KEY)
+            .header("Authorization", format!("Bearer {}", crate::extension_manager::SUPABASE_ANON_KEY))
+            .send()
+            .await
+            .map_err(|e| format!("Pull failed: {}", e))?;
+
+        if !response.status().is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(format!("Supabase error: {}", body));
+        }
+
+        let data: Vec<serde_json::Value> = response.json().await.map_err(|e| format!("Parse failed: {}", e))?;
+        if let Some(row) = data.first() {
+            if let Some(settings) = row["settings"].as_object() {
+                for (key, val) in settings {
+                    let store = StoreBuilder::new(&app_handle, store_path.clone())
+                        .build()
+                        .map_err(|e| format!("Store build failed: {}", e))?;
+                    store.set(key.clone(), val.clone());
+                    store.save().map_err(|e| format!("Save failed: {}", e))?;
+                }
+                return Ok("Settings restored from cloud.".to_owned());
+            }
+        }
+        Err("No settings found in cloud for this user.".to_owned())
+    }
+}
+

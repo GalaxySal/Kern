@@ -193,7 +193,8 @@ pub fn run() {
             tailwind_ext::tailwind_start_watcher,
             tailwind_ext::tailwind_stop_watcher,
             ai_client::stream_vibe_chat,
-            ai_client::apply_code_change
+            ai_client::apply_code_change,
+            ai_client::sync_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
