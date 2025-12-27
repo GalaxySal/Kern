@@ -18,9 +18,7 @@ pub struct Document {
 
 impl Document {
     pub fn new() -> Self {
-        Self {
-            text: Rope::new(),
-        }
+        Self { text: Rope::new() }
     }
 
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, DocumentError> {
@@ -33,7 +31,7 @@ impl Document {
     pub fn to_string(&self) -> String {
         self.text.to_string()
     }
-    
+
     // Create a viewing window (start line, end line)
     pub fn get_lines(&self, start: usize, end: usize) -> Vec<String> {
         let len_lines = self.text.len_lines();
@@ -41,11 +39,11 @@ impl Document {
             return Vec::new();
         }
         let end = std::cmp::min(end, len_lines);
-        
+
         // Ropey slices are efficient
         let mut lines = Vec::with_capacity(end - start);
         for i in start..end {
-             lines.push(self.text.line(i).to_string());
+            lines.push(self.text.line(i).to_string());
         }
         lines
     }

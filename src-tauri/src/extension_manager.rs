@@ -6,9 +6,9 @@
 // ============================================
 
 use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
-use std::path::{Path, PathBuf};
+use sha2::{Digest, Sha256};
 use std::fs::{self, File};
+use std::path::{Path, PathBuf};
 
 // Supabase configuration - will be loaded from environment
 const SUPABASE_URL: &str = "https://osgtltgosztvivcnltsw.supabase.co";
@@ -78,21 +78,20 @@ impl From<&str> for ExtensionError {
 
 /// Get the Kern extensions directory (~/.kern/extensions)
 pub fn get_extensions_dir() -> Result<PathBuf, ExtensionError> {
-    let home = dirs::home_dir()
-        .ok_or_else(|| ExtensionError {
-            code: "NO_HOME".to_string(),
-            message: "Could not find home directory".to_string(),
-        })?;
-    
+    let home = dirs::home_dir().ok_or_else(|| ExtensionError {
+        code: "NO_HOME".to_string(),
+        message: "Could not find home directory".to_string(),
+    })?;
+
     let ext_dir = home.join(".kern").join("extensions");
-    
+
     if !ext_dir.exists() {
         fs::create_dir_all(&ext_dir).map_err(|e| ExtensionError {
             code: "DIR_CREATE_FAILED".to_string(),
             message: format!("Failed to create extensions directory: {}", e),
         })?;
     }
-    
+
     Ok(ext_dir)
 }
 
@@ -104,16 +103,16 @@ fn get_manifest_path() -> Result<PathBuf, ExtensionError> {
 /// Read installed extensions from manifest
 pub fn get_installed_extensions() -> Result<Vec<InstalledExtension>, ExtensionError> {
     let manifest_path = get_manifest_path()?;
-    
+
     if !manifest_path.exists() {
         return Ok(Vec::new());
     }
-    
+
     let content = fs::read_to_string(&manifest_path).map_err(|e| ExtensionError {
         code: "MANIFEST_READ_FAILED".to_string(),
         message: format!("Failed to read manifest: {}", e),
     })?;
-    
+
     serde_json::from_str(&content).map_err(|e| ExtensionError {
         code: "MANIFEST_PARSE_FAILED".to_string(),
         message: format!("Failed to parse manifest: {}", e),
@@ -127,7 +126,7 @@ fn save_manifest(extensions: &[InstalledExtension]) -> Result<(), ExtensionError
         code: "MANIFEST_SERIALIZE_FAILED".to_string(),
         message: format!("Failed to serialize manifest: {}", e),
     })?;
-    
+
     fs::write(&manifest_path, content).map_err(|e| ExtensionError {
         code: "MANIFEST_WRITE_FAILED".to_string(),
         message: format!("Failed to write manifest: {}", e),
@@ -135,35 +134,38 @@ fn save_manifest(extensions: &[InstalledExtension]) -> Result<(), ExtensionError
 }
 
 /// Verify SHA256 checksum of a file (async, memory-efficient streaming)
-pub async fn verify_checksum(file_path: &Path, expected_hash: &str) -> Result<bool, ExtensionError> {
+pub async fn verify_checksum(
+    file_path: &Path,
+    expected_hash: &str,
+) -> Result<bool, ExtensionError> {
     use tokio::fs::File;
     use tokio::io::AsyncReadExt;
-    
+
     let mut file = File::open(file_path).await.map_err(|e| ExtensionError {
         code: "FILE_OPEN_FAILED".to_string(),
         message: format!("Failed to open file for checksum: {}", e),
     })?;
-    
+
     let mut hasher = Sha256::new();
     // Use 64KB buffer for optimal I/O performance while keeping memory low
     let mut buffer = vec![0u8; 64 * 1024];
-    
+
     loop {
         let bytes_read = file.read(&mut buffer).await.map_err(|e| ExtensionError {
             code: "FILE_READ_FAILED".to_string(),
             message: format!("Failed to read file: {}", e),
         })?;
-        
+
         if bytes_read == 0 {
             break;
         }
-        
+
         hasher.update(&buffer[..bytes_read]);
     }
-    
+
     let result = hasher.finalize();
     let computed_hash = hex::encode(result);
-    
+
     Ok(computed_hash.eq_ignore_ascii_case(expected_hash))
 }
 
@@ -173,23 +175,23 @@ fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<(), ExtensionError> {
         code: "ZIP_OPEN_FAILED".to_string(),
         message: format!("Failed to open ZIP: {}", e),
     })?;
-    
+
     let mut archive = zip::ZipArchive::new(file).map_err(|e| ExtensionError {
         code: "ZIP_INVALID".to_string(),
         message: format!("Invalid ZIP archive: {}", e),
     })?;
-    
+
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).map_err(|e| ExtensionError {
             code: "ZIP_ENTRY_FAILED".to_string(),
             message: format!("Failed to read ZIP entry: {}", e),
         })?;
-        
+
         let outpath = match entry.enclosed_name() {
             Some(path) => dest_dir.join(path),
             None => continue,
         };
-        
+
         // Security: Prevent path traversal attacks
         if !outpath.starts_with(dest_dir) {
             return Err(ExtensionError {
@@ -197,26 +199,26 @@ fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<(), ExtensionError> {
                 message: "ZIP contains path traversal attack".to_string(),
             });
         }
-        
+
         if entry.is_dir() {
             fs::create_dir_all(&outpath).ok();
         } else {
             if let Some(parent) = outpath.parent() {
                 fs::create_dir_all(parent).ok();
             }
-            
+
             let mut outfile = File::create(&outpath).map_err(|e| ExtensionError {
                 code: "FILE_CREATE_FAILED".to_string(),
                 message: format!("Failed to create file: {}", e),
             })?;
-            
+
             std::io::copy(&mut entry, &mut outfile).map_err(|e| ExtensionError {
                 code: "FILE_WRITE_FAILED".to_string(),
                 message: format!("Failed to write file: {}", e),
             })?;
         }
     }
-    
+
     Ok(())
 }
 
@@ -237,7 +239,7 @@ pub fn is_path_allowed(path: &Path, allowed_root: &Path) -> bool {
 pub async fn list_marketplace_extensions() -> Result<Vec<Extension>, ExtensionError> {
     // Try to fetch from Supabase first
     let client = reqwest::Client::new();
-    
+
     match client
         .get(format!("{}/rest/v1/extensions?select=*", SUPABASE_URL))
         .header("apikey", SUPABASE_ANON_KEY)
@@ -268,7 +270,7 @@ pub async fn list_marketplace_extensions() -> Result<Vec<Extension>, ExtensionEr
             eprintln!("Failed to reach Supabase: {}", e);
         }
     }
-    
+
     // Fallback: Return built-in extensions only
     Ok(vec![get_tailwind_extension()])
 }
@@ -305,29 +307,32 @@ pub fn list_installed_extensions() -> Result<Vec<InstalledExtension>, ExtensionE
 pub async fn install_extension(extension: Extension) -> Result<InstalledExtension, ExtensionError> {
     let ext_dir = get_extensions_dir()?;
     let ext_path = ext_dir.join(&extension.id);
-    
+
     // For development: Just create the directory and manifest entry
     // In production: Download, verify checksum, extract
-    
+
     fs::create_dir_all(&ext_path).map_err(|e| ExtensionError {
         code: "DIR_CREATE_FAILED".to_string(),
         message: format!("Failed to create extension directory: {}", e),
     })?;
-    
+
     // Create a marker file
     let marker_path = ext_path.join("installed.json");
-    fs::write(&marker_path, serde_json::to_string_pretty(&extension).unwrap_or_default())
-        .map_err(|e| ExtensionError {
-            code: "MARKER_WRITE_FAILED".to_string(),
-            message: format!("Failed to write marker: {}", e),
-        })?;
-    
+    fs::write(
+        &marker_path,
+        serde_json::to_string_pretty(&extension).unwrap_or_default(),
+    )
+    .map_err(|e| ExtensionError {
+        code: "MARKER_WRITE_FAILED".to_string(),
+        message: format!("Failed to write marker: {}", e),
+    })?;
+
     // Update manifest
     let mut installed = get_installed_extensions()?;
-    
+
     // Remove if already exists
     installed.retain(|e| e.id != extension.id);
-    
+
     let new_install = InstalledExtension {
         id: extension.id.clone(),
         name: extension.name.clone(),
@@ -336,10 +341,10 @@ pub async fn install_extension(extension: Extension) -> Result<InstalledExtensio
         permissions: extension.permissions.clone(),
         installed_at: chrono::Utc::now().to_rfc3339(),
     };
-    
+
     installed.push(new_install.clone());
     save_manifest(&installed)?;
-    
+
     Ok(new_install)
 }
 
@@ -348,18 +353,18 @@ pub async fn install_extension(extension: Extension) -> Result<InstalledExtensio
 pub fn uninstall_extension(extension_id: String) -> Result<(), ExtensionError> {
     let ext_dir = get_extensions_dir()?;
     let ext_path = ext_dir.join(&extension_id);
-    
+
     if ext_path.exists() {
         fs::remove_dir_all(&ext_path).map_err(|e| ExtensionError {
             code: "REMOVE_FAILED".to_string(),
             message: format!("Failed to remove extension: {}", e),
         })?;
     }
-    
+
     // Update manifest
     let mut installed = get_installed_extensions()?;
     installed.retain(|e| e.id != extension_id);
     save_manifest(&installed)?;
-    
+
     Ok(())
 }

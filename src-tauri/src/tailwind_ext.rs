@@ -1,16 +1,16 @@
 // ============================================
 // Kern Tailwind v4 IntelliSense Extension
 // ID: com.kern.tailwind-v4
-// 
+//
 // Provides CSS IntelliSense for Tailwind v4
 // with @theme variable detection and Monaco
 // autocompletion support.
 // ============================================
 
+use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
-use notify::{RecommendedWatcher, RecursiveMode, Watcher, Config};
 use std::time::Duration;
 use tauri::Emitter;
 
@@ -21,10 +21,10 @@ static TAILWIND_WATCHER_ACTIVE: AtomicBool = AtomicBool::new(false);
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TailwindCompletion {
     pub label: String,
-    pub kind: String,       // "utility" | "custom" | "color" | "spacing"
-    pub detail: String,     // Description or CSS value
+    pub kind: String,   // "utility" | "custom" | "color" | "spacing"
+    pub detail: String, // Description or CSS value
     pub insert_text: String,
-    pub priority: i32,      // Higher = shown first (custom vars get 1000+)
+    pub priority: i32, // Higher = shown first (custom vars get 1000+)
 }
 
 /// Full completions payload sent to frontend
@@ -38,20 +38,20 @@ pub struct TailwindCompletions {
 /// Parse @theme block from CSS content
 fn parse_theme_block(css_content: &str) -> Vec<TailwindCompletion> {
     let mut completions = Vec::new();
-    
+
     // Find @theme { ... } blocks
     let mut in_theme = false;
     let mut brace_count = 0;
     let mut theme_content = String::new();
-    
+
     for line in css_content.lines() {
         let trimmed = line.trim();
-        
+
         if trimmed.starts_with("@theme") {
             in_theme = true;
             brace_count = 0;
         }
-        
+
         if in_theme {
             for ch in line.chars() {
                 if ch == '{' {
@@ -67,7 +67,7 @@ fn parse_theme_block(css_content: &str) -> Vec<TailwindCompletion> {
             theme_content.push('\n');
         }
     }
-    
+
     // Parse CSS custom properties from theme content
     // Format: --color-primary: #007acc;
     for line in theme_content.lines() {
@@ -76,10 +76,10 @@ fn parse_theme_block(css_content: &str) -> Vec<TailwindCompletion> {
             if let Some(colon_pos) = trimmed.find(':') {
                 let var_name = trimmed[..colon_pos].trim();
                 let var_value = trimmed[colon_pos + 1..].trim().trim_end_matches(';');
-                
+
                 // Convert --color-primary to color-primary (Tailwind class name)
                 let class_name = var_name.trim_start_matches("--");
-                
+
                 // Determine kind based on name
                 let kind = if class_name.contains("color") || class_name.contains("bg") {
                     "color"
@@ -88,7 +88,7 @@ fn parse_theme_block(css_content: &str) -> Vec<TailwindCompletion> {
                 } else {
                     "custom"
                 };
-                
+
                 completions.push(TailwindCompletion {
                     label: class_name.to_string(),
                     kind: kind.to_string(),
@@ -99,23 +99,23 @@ fn parse_theme_block(css_content: &str) -> Vec<TailwindCompletion> {
             }
         }
     }
-    
+
     completions
 }
 
 /// Scan CSS files in a directory for @theme definitions
 fn scan_css_files(root: &Path) -> Vec<TailwindCompletion> {
     use ignore::WalkBuilder;
-    
+
     let mut all_completions = Vec::new();
-    
+
     let walker = WalkBuilder::new(root)
         .hidden(false)
         .ignore(true)
         .git_ignore(true)
         .max_depth(Some(10))
         .build();
-    
+
     for result in walker {
         if let Ok(entry) = result {
             let path = entry.path();
@@ -131,7 +131,7 @@ fn scan_css_files(root: &Path) -> Vec<TailwindCompletion> {
             }
         }
     }
-    
+
     all_completions
 }
 
@@ -149,7 +149,6 @@ fn get_default_utilities() -> Vec<TailwindCompletion> {
         ("inline", "Display: inline", 100),
         ("hidden", "Display: none", 100),
         ("contents", "Display: contents", 100),
-        
         // Flexbox
         ("flex-row", "Flex direction: row", 90),
         ("flex-col", "Flex direction: column", 90),
@@ -162,18 +161,40 @@ fn get_default_utilities() -> Vec<TailwindCompletion> {
         ("grow-0", "Flex-grow: 0", 90),
         ("shrink", "Flex-shrink: 1", 90),
         ("shrink-0", "Flex-shrink: 0", 90),
-        
         // Grid
-        ("grid-cols-1", "Grid template columns: repeat(1, minmax(0, 1fr))", 85),
-        ("grid-cols-2", "Grid template columns: repeat(2, minmax(0, 1fr))", 85),
-        ("grid-cols-3", "Grid template columns: repeat(3, minmax(0, 1fr))", 85),
-        ("grid-cols-4", "Grid template columns: repeat(4, minmax(0, 1fr))", 85),
-        ("grid-cols-6", "Grid template columns: repeat(6, minmax(0, 1fr))", 85),
-        ("grid-cols-12", "Grid template columns: repeat(12, minmax(0, 1fr))", 85),
+        (
+            "grid-cols-1",
+            "Grid template columns: repeat(1, minmax(0, 1fr))",
+            85,
+        ),
+        (
+            "grid-cols-2",
+            "Grid template columns: repeat(2, minmax(0, 1fr))",
+            85,
+        ),
+        (
+            "grid-cols-3",
+            "Grid template columns: repeat(3, minmax(0, 1fr))",
+            85,
+        ),
+        (
+            "grid-cols-4",
+            "Grid template columns: repeat(4, minmax(0, 1fr))",
+            85,
+        ),
+        (
+            "grid-cols-6",
+            "Grid template columns: repeat(6, minmax(0, 1fr))",
+            85,
+        ),
+        (
+            "grid-cols-12",
+            "Grid template columns: repeat(12, minmax(0, 1fr))",
+            85,
+        ),
         ("col-span-1", "Grid column: span 1", 85),
         ("col-span-2", "Grid column: span 2", 85),
         ("col-span-full", "Grid column: 1 / -1", 85),
-        
         // Justify & Align
         ("justify-start", "Justify content: flex-start", 80),
         ("justify-center", "Justify content: center", 80),
@@ -184,7 +205,6 @@ fn get_default_utilities() -> Vec<TailwindCompletion> {
         ("items-center", "Align items: center", 80),
         ("items-end", "Align items: flex-end", 80),
         ("items-stretch", "Align items: stretch", 80),
-        
         // Spacing - Padding
         ("p-0", "Padding: 0", 70),
         ("p-1", "Padding: 0.25rem", 70),
@@ -200,7 +220,6 @@ fn get_default_utilities() -> Vec<TailwindCompletion> {
         ("pb-4", "Padding bottom: 1rem", 70),
         ("pl-4", "Padding left: 1rem", 70),
         ("pr-4", "Padding right: 1rem", 70),
-        
         // Spacing - Margin
         ("m-0", "Margin: 0", 70),
         ("m-1", "Margin: 0.25rem", 70),
@@ -213,14 +232,12 @@ fn get_default_utilities() -> Vec<TailwindCompletion> {
         ("mb-4", "Margin bottom: 1rem", 70),
         ("ml-4", "Margin left: 1rem", 70),
         ("mr-4", "Margin right: 1rem", 70),
-        
         // Gap
         ("gap-1", "Gap: 0.25rem", 70),
         ("gap-2", "Gap: 0.5rem", 70),
         ("gap-4", "Gap: 1rem", 70),
         ("gap-6", "Gap: 1.5rem", 70),
         ("gap-8", "Gap: 2rem", 70),
-        
         // Width & Height
         ("w-full", "Width: 100%", 65),
         ("w-auto", "Width: auto", 65),
@@ -236,7 +253,6 @@ fn get_default_utilities() -> Vec<TailwindCompletion> {
         ("max-w-md", "Max width: 28rem", 65),
         ("max-w-lg", "Max width: 32rem", 65),
         ("max-w-xl", "Max width: 36rem", 65),
-        
         // Typography
         ("text-xs", "Font size: 0.75rem", 60),
         ("text-sm", "Font size: 0.875rem", 60),
@@ -260,7 +276,6 @@ fn get_default_utilities() -> Vec<TailwindCompletion> {
         ("text-left", "Text align: left", 60),
         ("text-center", "Text align: center", 60),
         ("text-right", "Text align: right", 60),
-        
         // Colors
         ("text-white", "Color: white", 55),
         ("text-black", "Color: black", 55),
@@ -277,7 +292,6 @@ fn get_default_utilities() -> Vec<TailwindCompletion> {
         ("bg-gray-900", "Background: gray-900", 55),
         ("bg-blue-500", "Background: blue-500", 55),
         ("bg-transparent", "Background: transparent", 55),
-        
         // Border
         ("border", "Border: 1px solid", 50),
         ("border-0", "Border: 0", 50),
@@ -294,7 +308,6 @@ fn get_default_utilities() -> Vec<TailwindCompletion> {
         ("rounded-xl", "Border radius: 0.75rem", 50),
         ("rounded-full", "Border radius: 9999px", 50),
         ("rounded-none", "Border radius: 0", 50),
-        
         // Effects
         ("shadow", "Box shadow: default", 45),
         ("shadow-sm", "Box shadow: small", 45),
@@ -305,7 +318,6 @@ fn get_default_utilities() -> Vec<TailwindCompletion> {
         ("opacity-0", "Opacity: 0", 45),
         ("opacity-50", "Opacity: 0.5", 45),
         ("opacity-100", "Opacity: 1", 45),
-        
         // Position
         ("relative", "Position: relative", 40),
         ("absolute", "Position: absolute", 40),
@@ -320,7 +332,6 @@ fn get_default_utilities() -> Vec<TailwindCompletion> {
         ("z-0", "Z-index: 0", 40),
         ("z-10", "Z-index: 10", 40),
         ("z-50", "Z-index: 50", 40),
-        
         // Overflow
         ("overflow-auto", "Overflow: auto", 35),
         ("overflow-hidden", "Overflow: hidden", 35),
@@ -328,7 +339,6 @@ fn get_default_utilities() -> Vec<TailwindCompletion> {
         ("overflow-visible", "Overflow: visible", 35),
         ("overflow-x-auto", "Overflow-x: auto", 35),
         ("overflow-y-auto", "Overflow-y: auto", 35),
-        
         // Cursor & Pointer
         ("cursor-pointer", "Cursor: pointer", 30),
         ("cursor-default", "Cursor: default", 30),
@@ -337,7 +347,6 @@ fn get_default_utilities() -> Vec<TailwindCompletion> {
         ("pointer-events-auto", "Pointer events: auto", 30),
         ("select-none", "User select: none", 30),
         ("select-all", "User select: all", 30),
-        
         // Transitions
         ("transition", "Transition: all 150ms", 25),
         ("transition-colors", "Transition: colors 150ms", 25),
@@ -349,7 +358,6 @@ fn get_default_utilities() -> Vec<TailwindCompletion> {
         ("ease-in", "Timing: ease-in", 25),
         ("ease-out", "Timing: ease-out", 25),
         ("ease-in-out", "Timing: ease-in-out", 25),
-        
         // Transforms
         ("scale-100", "Scale: 1", 20),
         ("scale-105", "Scale: 1.05", 20),
@@ -359,19 +367,17 @@ fn get_default_utilities() -> Vec<TailwindCompletion> {
         ("rotate-180", "Rotate: 180deg", 20),
         ("translate-x-1", "Translate X: 0.25rem", 20),
         ("translate-y-1", "Translate Y: 0.25rem", 20),
-        
         // Hover/Focus prefixes (examples)
         ("hover:bg-gray-100", "On hover: bg-gray-100", 15),
         ("hover:text-blue-500", "On hover: text-blue-500", 15),
         ("focus:outline-none", "On focus: no outline", 15),
         ("focus:ring-2", "On focus: ring-2", 15),
         ("active:scale-95", "On active: scale 95%", 15),
-        
         // Dark mode
         ("dark:bg-gray-800", "Dark mode: bg-gray-800", 10),
         ("dark:text-white", "Dark mode: text-white", 10),
     ];
-    
+
     utilities
         .into_iter()
         .map(|(label, detail, priority)| TailwindCompletion {
@@ -392,17 +398,17 @@ fn get_default_utilities() -> Vec<TailwindCompletion> {
 #[tauri::command]
 pub fn tailwind_scan_project(root: String) -> Result<TailwindCompletions, String> {
     let root_path = std::path::Path::new(&root);
-    
+
     if !root_path.exists() {
         return Err(format!("Path does not exist: {}", root));
     }
-    
+
     // Get custom @theme properties from CSS files
     let custom_properties = scan_css_files(root_path);
-    
+
     // Get embedded Tailwind v4 utilities
     let utilities = get_default_utilities();
-    
+
     Ok(TailwindCompletions {
         custom_properties,
         utilities,
@@ -416,17 +422,16 @@ pub fn tailwind_start_watcher(root: String, app_handle: tauri::AppHandle) -> Res
     if TAILWIND_WATCHER_ACTIVE.load(Ordering::SeqCst) {
         return Ok(()); // Already watching
     }
-    
+
     TAILWIND_WATCHER_ACTIVE.store(true, Ordering::SeqCst);
-    
+
     let root_clone = root.clone();
-    
+
     std::thread::spawn(move || {
         let (tx, rx) = std::sync::mpsc::channel();
-        
-        let config = Config::default()
-            .with_poll_interval(Duration::from_secs(1));
-        
+
+        let config = Config::default().with_poll_interval(Duration::from_secs(1));
+
         let mut watcher: RecommendedWatcher = match Watcher::new(tx, config) {
             Ok(w) => w,
             Err(e) => {
@@ -435,36 +440,37 @@ pub fn tailwind_start_watcher(root: String, app_handle: tauri::AppHandle) -> Res
                 return;
             }
         };
-        
+
         if let Err(e) = watcher.watch(std::path::Path::new(&root_clone), RecursiveMode::Recursive) {
             eprintln!("Failed to watch directory: {}", e);
             TAILWIND_WATCHER_ACTIVE.store(false, Ordering::SeqCst);
             return;
         }
-        
+
         println!("Tailwind watcher started for: {}", root_clone);
-        
+
         while TAILWIND_WATCHER_ACTIVE.load(Ordering::SeqCst) {
             match rx.recv_timeout(Duration::from_millis(500)) {
                 Ok(result) => {
                     if let Ok(event) = result {
                         // Check if any changed file is CSS
-                        let css_changed = event.paths.iter().any(|p| {
-                            p.extension().map(|e| e == "css").unwrap_or(false)
-                        });
-                        
+                        let css_changed = event
+                            .paths
+                            .iter()
+                            .any(|p| p.extension().map(|e| e == "css").unwrap_or(false));
+
                         if css_changed {
                             // Re-scan and emit updated completions
                             let root_path = std::path::Path::new(&root_clone);
                             let custom_properties = scan_css_files(root_path);
                             let utilities = get_default_utilities();
-                            
+
                             let completions = TailwindCompletions {
                                 custom_properties,
                                 utilities,
                                 project_root: root_clone.clone(),
                             };
-                            
+
                             let _ = app_handle.emit("tailwind-completions-updated", completions);
                             println!("Tailwind completions updated");
                         }
@@ -474,11 +480,11 @@ pub fn tailwind_start_watcher(root: String, app_handle: tauri::AppHandle) -> Res
                 Err(_) => break,
             }
         }
-        
+
         TAILWIND_WATCHER_ACTIVE.store(false, Ordering::SeqCst);
         println!("Tailwind watcher stopped");
     });
-    
+
     Ok(())
 }
 
