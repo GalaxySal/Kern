@@ -35,9 +35,10 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install frontend dependencies
-        working-directory: ui
-        run: npm install
+      - name: Install dependencies
+        run: |
+          npm install
+          npm install --prefix ui
 
       - name: Update Tauri configuration
         # This ensuring the bundle identifier and other fields are correct for release
