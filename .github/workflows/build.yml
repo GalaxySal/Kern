@@ -1,8 +1,12 @@
 name: Release
 on:
   push:
+    branches:
+      - dev
+      - main
     tags:
-      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+      - 'v*'
+  workflow_dispatch: # Allows manual trigger from Actions tab
 
 jobs:
   release:
