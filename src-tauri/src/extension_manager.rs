@@ -133,8 +133,8 @@ fn save_manifest(extensions: &[InstalledExtension]) -> Result<(), ExtensionError
     })
 }
 
-#[allow(dead_code)]
 /// Verify SHA256 checksum of a file (async, memory-efficient streaming)
+#[allow(dead_code)]
 pub async fn verify_checksum(
     file_path: &Path,
     expected_hash: &str,
@@ -170,8 +170,8 @@ pub async fn verify_checksum(
     Ok(computed_hash.eq_ignore_ascii_case(expected_hash))
 }
 
-#[allow(dead_code)]
 /// Extract ZIP archive to destination
+#[allow(dead_code)]
 fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<(), ExtensionError> {
     let file = File::open(zip_path).map_err(|e| ExtensionError {
         code: "ZIP_OPEN_FAILED".to_string(),
