@@ -54,6 +54,6 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'Kern v${{ github.ref_name }}'
           releaseBody: 'See the assets below for the latest version of Kern Editor.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           projectPath: . # Using root package.json for standard layout
