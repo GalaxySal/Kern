@@ -116,7 +116,10 @@ fn scan_css_files(root: &Path) -> Vec<TailwindCompletion> {
 
     for entry in walker.flatten() {
         let path = entry.path();
-        if let Some(content) = std::fs::read_to_string(path).ok().filter(|_| path.is_file() && path.extension().is_some_and(|ext| ext == "css")) {
+        if let Some(content) = std::fs::read_to_string(path)
+            .ok()
+            .filter(|_| path.is_file() && path.extension().is_some_and(|ext| ext == "css"))
+        {
             let mut file_completions = parse_theme_block(&content);
             all_completions.append(&mut file_completions);
         }

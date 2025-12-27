@@ -405,8 +405,8 @@ fn search_content(query: String, root: String, limit: usize) -> Vec<ContentMatch
                 .unwrap_or_default();
 
             let skip_exts = [
-                "png", "jpg", "jpeg", "gif", "ico", "woff", "woff2", "ttf", "eot", "pdf",
-                "zip", "tar", "gz", "exe", "dll", "so", "dylib", "node",
+                "png", "jpg", "jpeg", "gif", "ico", "woff", "woff2", "ttf", "eot", "pdf", "zip",
+                "tar", "gz", "exe", "dll", "so", "dylib", "node",
             ];
             if skip_exts.contains(&ext.as_str()) {
                 continue;

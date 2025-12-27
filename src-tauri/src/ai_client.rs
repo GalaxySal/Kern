@@ -50,7 +50,10 @@ pub async fn stream_vibe_chat(
         .build()
         .ok();
 
-    if let Some(s) = store.as_ref().filter(|_| model_id == "custom" || model_id == "ollama") {
+    if let Some(s) = store
+        .as_ref()
+        .filter(|_| model_id == "custom" || model_id == "ollama")
+    {
         if let Some(custom_id) = s
             .get("custom_model_id")
             .and_then(|v| v.as_str().map(|s| s.to_owned()))
