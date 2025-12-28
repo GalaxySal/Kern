@@ -26,6 +26,25 @@ export default defineConfig({
                         if (id.includes('basic-languages')) {
                             return 'monaco-languages';
                         }
+                        // Split features into smaller groups
+                        if (id.includes('contrib/find')) {
+                            return 'monaco-find';
+                        }
+                        if (id.includes('contrib/folding')) {
+                            return 'monaco-folding';
+                        }
+                        if (id.includes('contrib/bracket')) {
+                            return 'monaco-bracket';
+                        }
+                        if (id.includes('contrib/comment')) {
+                            return 'monaco-comment';
+                        }
+                        if (id.includes('contrib/hover')) {
+                            return 'monaco-hover';
+                        }
+                        if (id.includes('contrib/suggest')) {
+                            return 'monaco-suggest';
+                        }
                         if (id.includes('contrib')) {
                             return 'monaco-features';
                         }
