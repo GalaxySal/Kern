@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { open } from '@tauri-apps/plugin-dialog';
 
 // Granular Monaco Imports (The Diet)
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
@@ -88,9 +89,17 @@ async function updateEditor(content, path, filename) {
 
 async function openDirectory() {
     try {
-        const root = await invoke('open_project');
-        currentProjectRoot = root.path;
-        renderTree(root.children, fileTreeEl);
+        const selected = await open({
+            directory: true,
+            multiple: false,
+            title: 'Select Project Folder'
+        });
+        
+        if (selected && selected.length > 0) {
+            const root = await invoke('open_project', { root: selected[0] });
+            currentProjectRoot = root.path;
+            renderTree(root.children, fileTreeEl);
+        }
     } catch (e) { alert('Open folder failed: ' + e); }
 }
 
