@@ -16,6 +16,7 @@ pub struct AppState {
     // PtyPair contains Box<dyn MasterPty> and Box<dyn SlavePty>, which are Send.
     // So PtyPair itself is Send.
     pub pty_pair: Arc<Mutex<Option<PtyPair>>>,
+    pub pty_child: Arc<Mutex<Option<Box<dyn portable_pty::Child + Send + Sync>>>>,
 }
 
 #[tauri::command]
@@ -95,7 +96,7 @@ fn spawn_terminal(state: State<AppState>, app_handle: tauri::AppHandle) -> Resul
         .map_err(|e| e.to_string())?;
 
     let cmd = CommandBuilder::new("bash");
-    let _child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
+    let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
 
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
     let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
@@ -113,6 +114,12 @@ fn spawn_terminal(state: State<AppState>, app_handle: tauri::AppHandle) -> Resul
     {
         let mut pair_guard = state.pty_pair.lock().map_err(|_| "Failed to lock pair")?;
         *pair_guard = Some(pair);
+    }
+
+    // Store child process to keep it alive
+    {
+        let mut child_guard = state.pty_child.lock().map_err(|_| "Failed to lock child")?;
+        *child_guard = Some(child);
     }
 
     // Start reader thread
@@ -168,6 +175,7 @@ pub fn run() {
             document: Mutex::new(None),
             pty_writer: Arc::new(Mutex::new(None)),
             pty_pair: Arc::new(Mutex::new(None)),
+            pty_child: Arc::new(Mutex::new(None)),
         })
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())

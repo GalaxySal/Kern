@@ -90,7 +90,7 @@ async function sendVibePrompt(appState) {
             vibeChatHistory.scrollTop = vibeChatHistory.scrollHeight;
         });
 
-        await invoke('stream_vibe_chat', {
+        await invoke('streamVibeChat', {
             prompt,
             projectRoot: currentProjectRoot,
             modelId: modelId,
@@ -172,7 +172,7 @@ async function applyVibeCode(code, appState) {
     }
 
     try {
-        await invoke('apply_code_change', {
+        await invoke('applyCodeChange', {
             projectRoot: currentProjectRoot,
             filePath: currentFilePath,
             code

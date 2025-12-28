@@ -1,4 +1,5 @@
 import { load } from '@tauri-apps/plugin-store';
+import { invoke } from '@tauri-apps/api/core';
 
 export async function initSettings(appState) {
     const {
@@ -59,7 +60,7 @@ export async function initSettings(appState) {
 
     document.getElementById('vibe-push-settings').addEventListener('click', async () => {
         try {
-            const result = await window.__TAURI__.core.invoke('sync_settings', { action: 'push' });
+            const result = await invoke('sync_settings', { action: 'push' });
             alert(result);
         } catch (err) {
             alert('Push failed: ' + err);
@@ -69,7 +70,7 @@ export async function initSettings(appState) {
     document.getElementById('vibe-pull-settings').addEventListener('click', async () => {
         if (!confirm('This will overwrite your local keys. Continue?')) return;
         try {
-            const result = await window.__TAURI__.core.invoke('sync_settings', { action: 'pull' });
+            const result = await invoke('sync_settings', { action: 'pull' });
             alert(result);
             // Reload page to refresh settings in memory
             window.location.reload();

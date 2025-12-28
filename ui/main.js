@@ -78,7 +78,7 @@ async function updateEditor(content, path, filename) {
     // [The Diet]: Dynamic Language Loading
     if (!['rust', 'javascript', 'typescript', 'plaintext'].includes(lang)) {
         try {
-            await import(`monaco-editor/esm/vs/basic-languages/${lang}/${lang}.contribution`);
+            await import(/* @vite-ignore */ `monaco-editor/esm/vs/basic-languages/${lang}/${lang}.contribution`);
         } catch (e) { console.warn(`Lang ${lang} lazy-load failed.`); }
     }
 
@@ -109,7 +109,7 @@ function renderTree(entries, parentElement) {
                     const sub = document.createElement('div');
                     sub.className = 'pl-4';
                     div.after(sub);
-                    const updated = await invoke('load_directory', { path: entry.path });
+                    const updated = await invoke('readDir', { path: entry.path });
                     renderTree(updated, sub);
                 } else div.nextElementSibling?.remove();
             };
@@ -128,9 +128,9 @@ async function initTerminal() {
     term.loadAddon(fitAddon);
     term.open(termContainer);
     fitAddon.fit();
-    await listen('terminal-stdout', (e) => term.write(e.payload));
-    term.onData(data => invoke('write_term', { data }));
-    await invoke('spawn_term');
+    await listen('term-data', (e) => term.write(e.payload));
+    term.onData(data => invoke('write_to_terminal', { data }));
+    await invoke('spawn_terminal');
     window.addEventListener('resize', () => fitAddon.fit());
 }
 initTerminal();
@@ -155,9 +155,9 @@ async function bootstrap() {
             customModelContainer: document.getElementById('vibe-custom-model-container'),
             settingsView: document.getElementById('vibe-settings-view'),
             settingsBtn: document.getElementById('vibe-settings-btn'),
-            vibeSaveBtn: document.getElementById('vibe-save-btn'),
-            vibeToggleBtn: document.getElementById('vibe-toggle-btn'),
-            closeVibeBtn: document.getElementById('vibe-close-btn')
+            vibeSaveBtn: document.getElementById('save-vibe-settings'),
+            vibeToggleBtn: document.getElementById('toggle-vibe-btn'),
+            closeVibeBtn: document.getElementById('close-vibe-btn')
         }
     };
 
