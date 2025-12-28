@@ -129,6 +129,25 @@ function renderTree(entries, parentElement) {
 
 openDirBtn.addEventListener('click', openDirectory);
 
+// Menu Event Handlers
+document.getElementById('action-open-file')?.addEventListener('click', async () => {
+    try {
+        const selected = await open({
+            multiple: false,
+            filters: [{
+                name: 'All Files',
+                extensions: ['*']
+            }]
+        });
+        
+        if (selected && selected.length > 0) {
+            await openFile(selected[0]);
+        }
+    } catch (e) { alert('Open file failed: ' + e); }
+});
+
+document.getElementById('action-save-file')?.addEventListener('click', saveFile);
+
 // Terminal
 const termContainer = document.getElementById('panel-content-terminal');
 async function initTerminal() {
