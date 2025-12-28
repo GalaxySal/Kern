@@ -14,6 +14,7 @@ export default defineConfig({
     },
     build: {
         cssCodeSplit: false,
+        chunkSizeWarningLimit: 1000,
         rollupOptions: {
             output: {
                 // [Nihai Diyet]: Force every single monaco bit out of index.js
@@ -26,27 +27,32 @@ export default defineConfig({
                         if (id.includes('basic-languages')) {
                             return 'monaco-languages';
                         }
-                        // Split features into smaller groups
-                        if (id.includes('contrib/find')) {
+                        // Split by major components
+                        if (id.includes('contrib/find') || id.includes('findController')) {
                             return 'monaco-find';
                         }
-                        if (id.includes('contrib/folding')) {
+                        if (id.includes('contrib/folding') || id.includes('folding')) {
                             return 'monaco-folding';
                         }
-                        if (id.includes('contrib/bracket')) {
+                        if (id.includes('contrib/bracket') || id.includes('bracketMatching')) {
                             return 'monaco-bracket';
                         }
-                        if (id.includes('contrib/comment')) {
+                        if (id.includes('contrib/comment') || id.includes('comment')) {
                             return 'monaco-comment';
                         }
-                        if (id.includes('contrib/hover')) {
+                        if (id.includes('contrib/hover') || id.includes('hover')) {
                             return 'monaco-hover';
                         }
-                        if (id.includes('contrib/suggest')) {
+                        if (id.includes('contrib/suggest') || id.includes('suggest')) {
                             return 'monaco-suggest';
                         }
+                        // Split remaining misc by size
                         if (id.includes('contrib')) {
                             return 'monaco-features';
+                        }
+                        // Split misc further
+                        if (id.includes('services') || id.includes('standalone')) {
+                            return 'monaco-services';
                         }
                         return 'monaco-misc';
                     }
