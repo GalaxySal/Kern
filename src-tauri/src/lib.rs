@@ -769,8 +769,18 @@ async fn open_project(root: String) -> Result<ProjectNode, String> {
     if cfg!(unix) {
         let path_str = root_path.to_string_lossy();
         let blocked_paths = [
-            "/", "/etc", "/bin", "/sbin", "/proc", "/sys", "/usr/bin", "/usr/sbin", "/var", "/dev",
-            "/boot", "/root",
+            "/",
+            "/etc",
+            "/bin",
+            "/sbin",
+            "/proc",
+            "/sys",
+            "/usr/bin",
+            "/usr/sbin",
+            "/var",
+            "/dev",
+            "/boot",
+            "/root",
         ];
 
         if blocked_paths.contains(&path_str.as_ref()) {
@@ -783,8 +793,11 @@ async fn open_project(root: String) -> Result<ProjectNode, String> {
         // Additional check: Don't allow opening direct subdirectories of / if they are typical system dirs
         if path_str.starts_with('/') && path_str.split('/').filter(|s| !s.is_empty()).count() <= 1 {
             let top_dir = path_str.trim_start_matches('/');
-            if blocked_paths.iter().any(|p| p.trim_start_matches('/') == top_dir) {
-                 return Err(format!(
+            if blocked_paths
+                .iter()
+                .any(|p| p.trim_start_matches('/') == top_dir)
+            {
+                return Err(format!(
                     "Restricted directory: '{}' is a system path and cannot be opened as a project.",
                     path_str
                 ));
