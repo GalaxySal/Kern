@@ -467,7 +467,8 @@ fn resize_terminal(rows: u16, cols: u16, state: State<AppState>) -> Result<(), S
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
+    let mut builder = tauri::Builder::default()
         .manage(AppState {
             document: Mutex::new(None),
             pty_writer: Arc::new(Mutex::new(None)),
@@ -479,34 +480,68 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::new().build())
-        .plugin(tauri_plugin_localhost::Builder::new(9527).build())
-        .plugin(tauri_plugin_deep_link::init())
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        .plugin(tauri_plugin_localhost::Builder::new(9527).build());
+
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.plugin(tauri_plugin_deep_link::init());
+    }
+
+    builder
+        /* tauri-plugin-deep-link causes 'state() called before manage()' panic on Linux.
+           We disable it on Linux/Windows and use manual argv/single-instance instead. */
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            println!("Second instance started with argv: {:?}", argv);
             let _ = app
                 .get_webview_window("main")
                 .expect("no main window")
                 .set_focus();
+
+            // Manually handle deep links passed via argv (common on all platforms)
+            for arg in argv {
+                if arg.starts_with("kern://") {
+                    println!("Manual deep link handoff from second instance: {}", arg);
+                    let mut tx_guard = AUTH_TX.lock().unwrap();
+                    if let Some(tx) = tx_guard.take() {
+                        let _ = tx.send(arg);
+                    }
+                }
+            }
         }))
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_persisted_scope::init())
-        .setup(|app| {
-            use tauri_plugin_deep_link::DeepLinkExt;
-
-            // Register the kern:// protocol at runtime for Windows and Linux compatibility
-            #[cfg(any(windows, target_os = "linux"))]
-            let _ = app.deep_link().register("kern");
-
-            app.deep_link().on_open_url(|event| {
-                for url in event.urls() {
-                    let url_str = url.to_string();
-                    if url_str.starts_with("kern://auth-callback") {
-                        let mut tx_guard = AUTH_TX.lock().unwrap();
-                        if let Some(tx) = tx_guard.take() {
-                            let _ = tx.send(url_str);
+        .setup(|_app| {
+            /* Only use deep-link plugin on macOS where it's required for native URL events */
+            #[cfg(target_os = "macos")]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                _app.deep_link().on_open_url(move |event| {
+                    let urls = event.urls();
+                    println!("macOS deep link event received: {:?}", urls);
+                    for url in urls {
+                        let url_str = url.to_string();
+                        if url_str.starts_with("kern://auth-callback") {
+                            let mut tx_guard = AUTH_TX.lock().unwrap();
+                            if let Some(tx) = tx_guard.take() {
+                                let _ = tx.send(url_str);
+                            }
                         }
                     }
+                });
+            }
+
+            // Linux & Windows & macOS (First Instance): check argv manually for links
+            // This catches the 'kern://...' link if the app was started BY the link.
+            for arg in std::env::args() {
+                if arg.starts_with("kern://auth-callback") {
+                    println!("Initial startup with deep link: {}", arg);
+                    let mut tx_guard = AUTH_TX.lock().unwrap();
+                    if let Some(tx) = tx_guard.take() {
+                        let _ = tx.send(arg);
+                    }
                 }
-            });
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -596,6 +631,7 @@ async fn authenticate_github(_app_handle: tauri::AppHandle) -> Result<AuthRespon
     use reqwest::Client;
 
     let _ = dotenvy::dotenv();
+    println!("Starting GitHub authentication flow...");
 
     let client_id = std::env::var("GITHUB_CLIENT_ID").unwrap_or_else(|_| {
         println!("Warning: GITHUB_CLIENT_ID not found in env, using fallback");
@@ -603,7 +639,7 @@ async fn authenticate_github(_app_handle: tauri::AppHandle) -> Result<AuthRespon
     });
     let client_secret = std::env::var("GITHUB_CLIENT_SECRET").unwrap_or_else(|_| {
         println!("Warning: GITHUB_CLIENT_SECRET not found in env, using fallback");
-        "e0952d431c009941a27e73541459a95729792015".to_string()
+        "5eff5a4dd6a6f8cb13f1978568140b6801a26a2e".to_string()
     });
 
     // Create a channel to receive the callback URL
@@ -628,30 +664,46 @@ async fn authenticate_github(_app_handle: tauri::AppHandle) -> Result<AuthRespon
     println!("Opening auth URL: {}", auth_url);
     shell_open(auth_url)?;
 
+    println!("Waiting for OAuth callback (kern://auth-callback)...");
+
     // Wait for the callback with a timeout
     let url_str = match tokio::time::timeout(std::time::Duration::from_secs(300), rx).await {
-        Ok(res) => res.map_err(|_| "Failed to receive OAuth callback".to_string())?,
+        Ok(res) => {
+            let val = res.map_err(|_| "Failed to receive OAuth callback".to_string())?;
+            println!("Received callback URL: {}", val);
+            val
+        },
         Err(_) => {
+            println!("Error: OAuth timeout reached after 300s");
             let mut tx_guard = AUTH_TX.lock().unwrap();
             *tx_guard = None;
             return Err("OAuth timeout reached".to_string());
         }
     };
 
+    println!("Parsing callback URL...");
     // Parse URL to get code
-    let url = url::Url::parse(&url_str).map_err(|_| "Failed to parse callback URL".to_string())?;
+    let url = url::Url::parse(&url_str).map_err(|e| format!("Failed to parse callback URL: {}", e))?;
     let code_pair = url.query_pairs().find(|(key, _)| key == "code");
 
     let code = match code_pair {
-        Some((_, code)) => code.to_string(),
-        None => return Err("No OAuth code received in parsed URL".to_string()),
+        Some((_, code)) => {
+            println!("Code extracted successfully.");
+            code.to_string()
+        },
+        None => {
+            println!("Error: No OAuth code found in callback URL");
+            return Err("No OAuth code received in parsed URL".to_string());
+        }
     };
 
+    println!("Exchanging code for access token...");
     // Exchange code for token
     let client = Client::new();
     let token_resp = client
         .post("https://github.com/login/oauth/access_token")
         .header("Accept", "application/json")
+        .header("User-Agent", "Kern-Editor")
         .json(&serde_json::json!({
             "client_id": client_id,
             "client_secret": client_secret,
@@ -659,18 +711,32 @@ async fn authenticate_github(_app_handle: tauri::AppHandle) -> Result<AuthRespon
         }))
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            println!("Error: Token request failed: {}", e);
+            e.to_string()
+        })?;
 
-    let token_data: serde_json::Value = token_resp.json().await.map_err(|e| e.to_string())?;
+    println!("Token response received. Decoding...");
+    let token_data: serde_json::Value = token_resp.json().await.map_err(|e| {
+        println!("Error: Failed to decode token response JSON: {}", e);
+        e.to_string()
+    })?;
 
     if let Some(error) = token_data.get("error") {
-        return Err(error.as_str().unwrap_or("Unknown OAuth error").to_string());
+        let err_msg = error.as_str().unwrap_or("Unknown OAuth error").to_string();
+        println!("Error: GitHub returned OAuth error: {}", err_msg);
+        return Err(err_msg);
     }
 
     let access_token = token_data["access_token"]
         .as_str()
-        .ok_or("No access token in response")?
+        .ok_or_else(|| {
+            println!("Error: No access_token in GitHub response: {:?}", token_data);
+            "No access token in response".to_string()
+        })?
         .to_string();
+
+    println!("Access token obtained. Fetching user info...");
 
     // Get user info
     let user_resp = client
@@ -679,9 +745,17 @@ async fn authenticate_github(_app_handle: tauri::AppHandle) -> Result<AuthRespon
         .header("User-Agent", "Kern-Editor")
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            println!("Error: User info request failed: {}", e);
+            e.to_string()
+        })?;
 
-    let user_data: GitHubUser = user_resp.json().await.map_err(|e| e.to_string())?;
+    let user_data: GitHubUser = user_resp.json().await.map_err(|e| {
+        println!("Error: Failed to decode user info JSON: {}", e);
+        e.to_string()
+    })?;
+
+    println!("GitHub Authentication successful for user: {}", user_data.login);
 
     Ok(AuthResponse {
         token: access_token,

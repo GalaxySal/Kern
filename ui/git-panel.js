@@ -214,18 +214,24 @@ export class GitPanel {
 
   async handleSignIn() {
     try {
+      console.log('[GitPanel] handleSignIn: Starting GitHub authentication...');
       this.showMessage('Starting GitHub authentication...');
       const response = await invoke('authenticate_github');
-      console.log('Auth success:', response);
-      if (response.token) {
+      console.log('[GitPanel] handleSignIn: Backend response:', response);
+      if (response && response.token) {
         await this.handleNewToken(response.token, response.user);
+      } else {
+        console.warn('[GitPanel] handleSignIn: Response missing token:', response);
+        this.showError('Authentication failed: No token received from backend');
       }
     } catch (error) {
+      console.error('[GitPanel] handleSignIn: Error:', error);
       this.showError('Authentication failed: ' + error);
     }
   }
 
   handleSignOut() {
+    console.log('[GitPanel] handleSignOut: Signing out...');
     localStorage.removeItem('github_token');
     localStorage.removeItem('github_user');
     this.githubToken = '';
@@ -235,17 +241,24 @@ export class GitPanel {
   }
 
   async handleNewToken(token, userData) {
+    console.log('[GitPanel] handleNewToken: Received token, user data exists:', !!userData);
     this.githubToken = token;
     localStorage.setItem('github_token', token);
 
     // Fetch user if not provided
     if (!userData) {
       try {
+        console.log('[GitPanel] handleNewToken: Fetching user info from GitHub API...');
         const resp = await fetch('https://api.github.com/user', {
           headers: { 'Authorization': `token ${token}` }
         });
-        if (resp.ok) userData = await resp.json();
-      } catch (e) { console.error('Error fetching user:', e); }
+        if (resp.ok) {
+          userData = await resp.json();
+          console.log('[GitPanel] handleNewToken: User info fetched:', userData.login);
+        } else {
+          console.warn('[GitPanel] handleNewToken: GitHub API error:', resp.status);
+        }
+      } catch (e) { console.error('[GitPanel] handleNewToken: Error fetching user:', e); }
     }
 
     if (userData) {
