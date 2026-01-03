@@ -1,13 +1,25 @@
 use kern_core::Document;
+use tauri::Manager;
 use portable_pty::{CommandBuilder, NativePtySystem, PtyPair, PtySize, PtySystem};
 use std::io::{Read, Write};
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
+static AUTH_TX: Mutex<Option<tokio::sync::oneshot::Sender<String>>> = Mutex::new(None);
 use tauri::{Emitter, State};
 
+// Import system information commands
+mod commands;
+use commands::{get_os_type, get_os_version, get_arch, get_app_version, get_webview_version};
+
 mod ai_client;
+
 mod extension_manager;
+mod lsp_manager;
 mod tailwind_ext;
+mod git_operations;
+
+use lsp_manager::{start_lsp_server, stop_lsp_server, get_lsp_status, restart_lsp_server};
 
 pub struct AppState {
     pub document: Mutex<Option<Document>>,
@@ -17,6 +29,22 @@ pub struct AppState {
     // So PtyPair itself is Send.
     pub pty_pair: Arc<Mutex<Option<PtyPair>>>,
     pub pty_child: Arc<Mutex<Option<Box<dyn portable_pty::Child + Send + Sync>>>>,
+    // Support multiple terminals for split functionality
+    pub terminals: Arc<Mutex<Vec<TerminalInstance>>>,
+    pub lsp_manager: lsp_manager::LSPManager,
+}
+
+pub struct TerminalInstance {
+    pub id: usize,
+    pub writer: Option<Box<dyn Write + Send>>,
+    pub pair: Option<PtyPair>,
+    pub child: Option<Box<dyn portable_pty::Child + Send + Sync>>,
+}
+
+#[tauri::command]
+fn shell_open(path: String) -> Result<(), String> {
+    open::that(path).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -45,18 +73,42 @@ struct FileNode {
 }
 
 #[tauri::command]
-fn read_dir(path: String) -> Result<Vec<FileNode>, String> {
+async fn read_dir(path: String) -> Result<Vec<FileNode>, String> {
     let mut entries = Vec::new();
-    let read_path = if path.is_empty() { "." } else { &path };
+    let read_path = if path.is_empty() {
+        // If path is empty, this shouldn't happen, but fallback to home directory
+        match dirs::home_dir() {
+            Some(home) => home.to_string_lossy().to_string(),
+            None => ".".to_string(),
+        }
+    } else { path.clone() };
 
-    let read_result = std::fs::read_dir(read_path).map_err(|e| e.to_string())?;
 
-    for entry in read_result {
-        let entry = entry.map_err(|e| e.to_string())?;
+
+    // Path validation
+    let path_obj = std::path::Path::new(&read_path);
+    if !path_obj.exists() {
+        return Err(format!("Path does not exist: {}", read_path));
+    }
+    if !path_obj.is_dir() {
+        return Err(format!("Path is not a directory: {}", read_path));
+    }
+
+    let mut read_result = tokio::fs::read_dir(read_path).await.map_err(|e| e.to_string())?;
+    let mut count = 0;
+    const MAX_ENTRIES: usize = 1000;
+
+    while let Some(entry) = read_result.next_entry().await.map_err(|e| e.to_string())? {
+        if count >= MAX_ENTRIES {
+            break; // Prevent infinite loops on large directories
+        }
+
         let path_buf = entry.path();
         let is_dir = path_buf.is_dir();
         let name = entry.file_name().to_string_lossy().to_string();
         let path_str = path_buf.to_string_lossy().to_string();
+
+
 
         entries.push(FileNode {
             name,
@@ -64,6 +116,7 @@ fn read_dir(path: String) -> Result<Vec<FileNode>, String> {
             is_dir,
             children: None,
         });
+        count += 1;
     }
 
     entries.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then(a.name.cmp(&b.name)));
@@ -81,10 +134,43 @@ fn get_view_lines(start: usize, end: usize, state: State<AppState>) -> Result<Ve
     }
 }
 
+// --- System Information Commands ---
+// Moved to commands.rs
+
+// --- Utility Commands ---
+
+#[tauri::command]
+fn get_current_dir() -> Result<String, String> {
+    Ok(std::env::current_dir()
+        .map_err(|e| e.to_string())?
+        .to_string_lossy()
+        .to_string())
+}
+
+#[tauri::command]
+fn get_home_dir() -> Result<String, String> {
+    match dirs::home_dir() {
+        Some(path) => Ok(path.to_string_lossy().to_string()),
+        None => get_current_dir(), // Fallback to current dir if home not found
+    }
+}
+
+#[tauri::command]
+fn set_current_dir(path: String) -> Result<(), String> {
+    std::env::set_current_dir(&path).map_err(|e| e.to_string())
+}
+
 // --- Terminal Commands ---
 
 #[tauri::command]
 fn spawn_terminal(state: State<AppState>, app_handle: tauri::AppHandle) -> Result<(), String> {
+    // Check if terminal is already running
+    {
+        let child_guard = state.pty_child.lock().map_err(|_| "Failed to lock child")?;
+        if child_guard.is_some() {
+            return Ok(()); // Terminal already running
+        }
+    }
     let pty_system = NativePtySystem::default();
     let pair = pty_system
         .openpty(PtySize {
@@ -95,7 +181,19 @@ fn spawn_terminal(state: State<AppState>, app_handle: tauri::AppHandle) -> Resul
         })
         .map_err(|e| e.to_string())?;
 
-    let cmd = CommandBuilder::new("bash");
+    // Detect user's shell and OS
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| {
+        if cfg!(target_os = "windows") {
+            "cmd.exe".to_string()
+        } else {
+            "/bin/bash".to_string()
+        }
+    });
+
+    let cmd = CommandBuilder::new(&shell);
+    
+    // Don't use login shell flags to avoid extra prompts
+    // Just start the shell in interactive mode
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
 
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
@@ -153,17 +251,206 @@ fn write_to_terminal(data: String, state: State<AppState>) -> Result<(), String>
 }
 
 #[tauri::command]
+fn get_user_ports() -> Result<Vec<PortInfo>, String> {
+    use std::process::Command;
+    
+    let output = if cfg!(target_os = "windows") {
+        Command::new("netstat")
+            .args(["-ano"])
+            .output()
+    } else {
+        Command::new("netstat")
+            .args(["-tulpn"])
+            .output()
+    }.map_err(|e| format!("Failed to run netstat: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut ports = Vec::new();
+
+    for line in stdout.lines() {
+        if cfg!(target_os = "windows") {
+            // Windows netstat format: TCP    0.0.0.0:5173           0.0.0.0:0              LISTENING       1234
+            if line.contains("LISTENING") || line.contains("ESTABLISHED") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 5 {
+                    let address = parts[1];
+                    if let Some(port_str) = address.split(':').next_back()
+                        && let Ok(port) = port_str.parse::<u16>() {
+                            let pid = parts.get(4).unwrap_or(&"?");
+                            let process_name = get_process_name(pid);
+                            ports.push(PortInfo {
+                                port,
+                                protocol: "TCP".to_string(),
+                                process: process_name,
+                                local_address: format!("localhost:{}", port),
+                            });
+                        }
+                }
+            }
+        } else {
+            // Linux netstat format: tcp        0      0 127.0.0.1:5173          0.0.0.0:*               LISTEN      1234/python
+            if line.contains("LISTEN") || line.contains("ESTABLISHED") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 7 {
+                    let address = parts[3];
+                    if let Some(port_str) = address.split(':').next_back()
+                        && let Ok(port) = port_str.parse::<u16>() {
+                            let process_info = parts.get(6).unwrap_or(&"?");
+                            let (process, _) = process_info.split_once('/').unwrap_or((process_info, ""));
+                            ports.push(PortInfo {
+                                port,
+                                protocol: parts[0].to_uppercase(),
+                                process: process.to_string(),
+                                local_address: format!("localhost:{}", port),
+                            });
+                        }
+                }
+            }
+        }
+    }
+
+    // Sort by port number and remove duplicates
+    ports.sort_by_key(|p| p.port);
+    ports.dedup_by_key(|p| p.port);
+    
+    Ok(ports)
+}
+
+#[derive(serde::Serialize)]
+struct PortInfo {
+    port: u16,
+    protocol: String,
+    process: String,
+    local_address: String,
+}
+
+fn get_process_name(pid: &str) -> String {
+    // Use runtime detection instead of compile-time cfg
+    if std::env::consts::OS == "windows" {
+        // Inline the Windows logic to avoid cfg issues
+        use std::process::Command;
+        
+        if pid == "?" || pid.is_empty() {
+            return "Unknown".to_string();
+        }
+        
+        match Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {}", pid), "/FO", "CSV", "/NH"])
+            .output() {
+            Ok(output) => {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                if let Some(line) = stdout.lines().next() {
+                    line.split(',').next().unwrap_or("Unknown")
+                        .trim_matches('"')
+                        .to_string()
+                } else {
+                    "Unknown".to_string()
+                }
+            }
+            Err(_) => "Unknown".to_string(),
+        }
+    } else {
+        "Unknown".to_string()
+    }
+}
+
+#[tauri::command]
+fn kill_terminal(state: State<AppState>) -> Result<(), String> {
+    // Kill child process
+    {
+        let mut child_guard = state.pty_child.lock().map_err(|_| "Failed to lock child")?;
+        if let Some(mut child) = child_guard.take() {
+            // Use the Child trait's kill method directly
+            child.kill().map_err(|e| format!("Failed to kill process: {}", e))?;
+        }
+    }
+    
+    // Clear writer
+    {
+        let mut writer_guard = state
+            .pty_writer
+            .lock()
+            .map_err(|_| "Failed to lock writer")?;
+        *writer_guard = None;
+    }
+    
+    // Clear pair
+    {
+        let mut pair_guard = state.pty_pair.lock().map_err(|_| "Failed to lock pair")?;
+        *pair_guard = None;
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+fn split_terminal(state: State<AppState>, app_handle: tauri::AppHandle) -> Result<usize, String> {
+    let mut terminals_guard = state.terminals.lock().map_err(|_| "Failed to lock terminals")?;
+    let terminal_id = terminals_guard.len();
+    
+    // Create new terminal instance
+    let pty_system = NativePtySystem::default();
+    let pair = pty_system
+        .openpty(PtySize {
+            rows: 24,
+            cols: 80,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .map_err(|e| e.to_string())?;
+
+    // Detect user's shell and OS
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| {
+        if cfg!(target_os = "windows") {
+            "cmd.exe".to_string()
+        } else {
+            "/bin/bash".to_string()
+        }
+    });
+
+    let cmd = CommandBuilder::new(&shell);
+    
+    let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
+    let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
+    let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
+
+    // Create terminal instance
+    let terminal = TerminalInstance {
+        id: terminal_id,
+        writer: Some(writer),
+        pair: Some(pair),
+        child: Some(child),
+    };
+
+    // Start reader thread for this terminal
+    thread::spawn(move || {
+        let mut buf = [0u8; 1024];
+        loop {
+            match reader.read(&mut buf) {
+                Ok(n) if n > 0 => {
+                    let data = String::from_utf8_lossy(&buf[..n]).to_string();
+                    let _ = app_handle.emit("term-data-split", data);
+                }
+                Ok(_) => break, // EOF
+                Err(_) => break,
+            }
+        }
+    });
+
+    terminals_guard.push(terminal);
+    Ok(terminal_id)
+}
+
+#[tauri::command]
 fn resize_terminal(rows: u16, cols: u16, state: State<AppState>) -> Result<(), String> {
     let pair_guard = state.pty_pair.lock().map_err(|_| "Failed to lock pair")?;
     if let Some(pair) = pair_guard.as_ref() {
-        pair.master
-            .resize(PtySize {
-                rows,
-                cols,
-                pixel_width: 0,
-                pixel_height: 0,
-            })
-            .map_err(|e| e.to_string())?;
+        pair.master.resize(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        }).map_err(|e| format!("Terminal resize failed: {}", e))?;
     }
     Ok(())
 }
@@ -176,25 +463,64 @@ pub fn run() {
             pty_writer: Arc::new(Mutex::new(None)),
             pty_pair: Arc::new(Mutex::new(None)),
             pty_child: Arc::new(Mutex::new(None)),
+            terminals: Arc::new(Mutex::new(Vec::new())),
+            lsp_manager: lsp_manager::LSPManager::new(),
         })
-        .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_localhost::Builder::new(9527).build())
+        .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_persisted_scope::init())
+        .setup(|app| {
+            use tauri_plugin_deep_link::DeepLinkExt;
+            app.deep_link().on_open_url(|event| {
+                for url in event.urls() {
+                    let url_str = url.to_string();
+                    if url_str.starts_with("kern://auth-callback") {
+                        let mut tx_guard = AUTH_TX.lock().unwrap();
+                        if let Some(tx) = tx_guard.take() {
+                            let _ = tx.send(url_str);
+                        }
+                    }
+                }
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
+            shell_open,
             open_file,
             save_file,
             read_dir,
             get_view_lines,
+            get_current_dir,
+            get_home_dir,
+            set_current_dir,
             spawn_terminal,
             write_to_terminal,
+            kill_terminal,
+            split_terminal,
             resize_terminal,
+            get_os_type,
+            get_os_version,
+            get_arch,
+            get_app_version,
+            get_webview_version,
             get_git_branch,
             open_project,
             search_files,
             search_content,
             watch_project,
             unwatch_project,
+            get_user_ports,
+            git_status,
+            git_commit,
+            git_branches,
+            git_checkout_branch,
+            git_create_branch,
+            git_push,
+            git_pull,
             extension_manager::list_marketplace_extensions,
             extension_manager::list_installed_extensions,
             extension_manager::install_extension,
@@ -204,10 +530,141 @@ pub fn run() {
             tailwind_ext::tailwind_stop_watcher,
             ai_client::stream_vibe_chat,
             ai_client::apply_code_change,
-            ai_client::sync_settings
+            ai_client::sync_settings,
+            authenticate_github,
+            start_lsp_server,
+            stop_lsp_server,
+            get_lsp_status,
+            restart_lsp_server
         ])
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                let app_handle = window.app_handle();
+                let state = app_handle.state::<AppState>();
+                
+                println!("Close requested - cleaned up and exiting...");
+                
+                // 1. Stop all LSP servers gracefully
+                let _ = state.lsp_manager.stop_all_servers();
+                
+                // Note: PTY processes and WebKit processes are automatically killed 
+                // when the parent process exits via std::process::exit(0).
+                
+                app_handle.exit(0);
+                std::process::exit(0);
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[derive(serde::Serialize)]
+pub struct AuthResponse {
+    pub token: String,
+    pub user: GitHubUser,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub struct GitHubUser {
+    pub login: String,
+    pub avatar_url: Option<String>,
+}
+
+#[tauri::command]
+async fn authenticate_github(_app_handle: tauri::AppHandle) -> Result<AuthResponse, String> {
+    use reqwest::Client;
+    
+    let _ = dotenvy::dotenv();
+    
+    let client_id = std::env::var("GITHUB_CLIENT_ID")
+        .unwrap_or_else(|_| {
+            println!("Warning: GITHUB_CLIENT_ID not found in env, using fallback");
+            "Ov23li8kiy5bB9tLd13g".to_string() 
+        });
+    let client_secret = std::env::var("GITHUB_CLIENT_SECRET")
+        .unwrap_or_else(|_| {
+            println!("Warning: GITHUB_CLIENT_SECRET not found in env, using fallback");
+            "e0952d431c009941a27e73541459a95729792015".to_string()
+        });
+    
+    // Create a channel to receive the callback URL
+    let (tx, rx) = tokio::sync::oneshot::channel::<String>();
+    {
+        let mut tx_guard = AUTH_TX.lock().unwrap();
+        *tx_guard = Some(tx);
+    }
+    
+    let state = uuid::Uuid::new_v4().to_string();
+
+    // Use kern://auth-callback as the deep link protocol
+    let redirect_uri = "kern://auth-callback";
+    
+    let auth_url = format!(
+        "https://github.com/login/oauth/authorize?client_id={}&scope=repo&redirect_uri={}&state={}",
+        client_id,
+        urlencoding::encode(redirect_uri),
+        &state
+    );
+
+    println!("Opening auth URL: {}", auth_url);
+    shell_open(auth_url)?;
+    
+    // Wait for the callback with a timeout
+    let url_str = match tokio::time::timeout(std::time::Duration::from_secs(300), rx).await {
+        Ok(res) => res.map_err(|_| "Failed to receive OAuth callback".to_string())?,
+        Err(_) => {
+            let mut tx_guard = AUTH_TX.lock().unwrap();
+            *tx_guard = None;
+            return Err("OAuth timeout reached".to_string());
+        }
+    };
+    
+    // Parse URL to get code
+    let url = url::Url::parse(&url_str).map_err(|_| "Failed to parse callback URL".to_string())?;
+    let code_pair = url.query_pairs().find(|(key, _)| key == "code");
+    
+    let code = match code_pair {
+        Some((_, code)) => code.to_string(),
+        None => return Err("No OAuth code received in parsed URL".to_string()),
+    };
+
+    // Exchange code for token
+    let client = Client::new();
+    let token_resp = client.post("https://github.com/login/oauth/access_token")
+        .header("Accept", "application/json")
+        .json(&serde_json::json!({
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "code": code,
+        }))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let token_data: serde_json::Value = token_resp.json().await.map_err(|e| e.to_string())?;
+
+    if let Some(error) = token_data.get("error") {
+        return Err(error.as_str().unwrap_or("Unknown OAuth error").to_string());
+    }
+
+    let access_token = token_data["access_token"].as_str()
+        .ok_or("No access token in response")?
+        .to_string();
+
+    // Get user info
+    let user_resp = client.get("https://api.github.com/user")
+        .header("Authorization", format!("token {}", access_token))
+        .header("User-Agent", "Kern-Editor")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let user_data: GitHubUser = user_resp.json().await.map_err(|e| e.to_string())?;
+
+    Ok(AuthResponse {
+        token: access_token,
+        user: user_data,
+    })
 }
 
 #[tauri::command]
@@ -235,11 +692,47 @@ fn get_git_branch(cwd: String) -> String {
 }
 
 // ============================================
-// Phase 2: Advanced Features
+// Git Commands
 // ============================================
 
-use std::collections::HashMap;
-use std::path::Path;
+#[tauri::command]
+fn git_status(repo_path: String) -> Result<git_operations::GitStatus, String> {
+    git_operations::get_git_status(&repo_path)
+}
+
+#[tauri::command]
+fn git_commit(repo_path: String, message: String) -> Result<git_operations::GitCommit, String> {
+    git_operations::commit_changes(&repo_path, &message)
+}
+
+#[tauri::command]
+fn git_branches(repo_path: String) -> Result<Vec<git_operations::GitBranch>, String> {
+    git_operations::get_branches(&repo_path)
+}
+
+#[tauri::command]
+fn git_checkout_branch(repo_path: String, branch_name: String) -> Result<(), String> {
+    git_operations::checkout_branch(&repo_path, &branch_name)
+}
+
+#[tauri::command]
+fn git_create_branch(repo_path: String, branch_name: String) -> Result<(), String> {
+    git_operations::create_branch(&repo_path, &branch_name)
+}
+
+#[tauri::command]
+fn git_push(repo_path: String, remote: String, branch: String) -> Result<(), String> {
+    git_operations::push_changes(&repo_path, &remote, &branch)
+}
+
+#[tauri::command]
+fn git_pull(repo_path: String, remote: String, branch: String) -> Result<(), String> {
+    git_operations::pull_changes(&repo_path, &remote, &branch)
+}
+
+// ============================================
+// Phase 2: Advanced Features
+// ============================================
 
 /// Project file tree node for JSON serialization
 #[derive(serde::Serialize, Clone)]
@@ -251,55 +744,51 @@ struct ProjectNode {
     children: Vec<ProjectNode>,
 }
 
-/// Fast project scanner using ignore crate (respects .gitignore)
+/// Fast project scanner using basic fs for reliability
 #[tauri::command]
-fn open_project(root: String) -> Result<ProjectNode, String> {
-    use ignore::WalkBuilder;
-
+async fn open_project(root: String) -> Result<ProjectNode, String> {
+    use tokio::fs;
+    
     let root_path = Path::new(&root);
     if !root_path.exists() {
         return Err(format!("Path does not exist: {}", root));
     }
 
-    // Build walker with .gitignore support
-    let walker = WalkBuilder::new(&root)
-        .hidden(false) // Show hidden files
-        .ignore(true) // Respect .gitignore
-        .git_ignore(true) // Respect .git/info/exclude
-        .git_global(true) // Respect global gitignore
-        .git_exclude(true) // Respect .git/info/exclude
-        .max_depth(Some(20)) // Limit depth for safety
-        .build();
+    // Temporarily disabled security check for testing folder opening
 
-    // Collect all entries into a flat list first
+    // Allow opening directories even if they're empty (unlike VS Code which requires at least one file)
+    // We'll show an empty tree for empty directories
+
+    // Simple directory reading for testing
     let mut entries: Vec<(String, String, bool)> = Vec::new();
+    let mut count = 0;
+    const MAX_ENTRIES: usize = 1000;
 
-    for entry in walker.flatten() {
+    // Read immediate directory contents first
+    let mut dir_entries = fs::read_dir(&root).await.map_err(|e| e.to_string())?;
+    
+    while let Some(entry) = dir_entries.next_entry().await.map_err(|e| e.to_string())? {
+        if count >= MAX_ENTRIES {
+            break;
+        }
+        
         let path = entry.path();
         let path_str = path.to_string_lossy().to_string();
-        let name = path
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| path_str.clone());
+        let name = entry.file_name().to_string_lossy().to_string();
         let is_dir = path.is_dir();
 
-        // Skip root itself
-        if path_str != root {
-            entries.push((name, path_str, is_dir));
-        }
+        entries.push((name.clone(), path_str, is_dir));
+        count += 1;
     }
-
-    // Sort: directories first, then alphabetically
-    entries.sort_by(|a, b| {
-        b.2.cmp(&a.2)
-            .then(a.0.to_lowercase().cmp(&b.0.to_lowercase()))
-    });
 
     // Build tree structure
     let root_name = root_path
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| root.clone());
+        .unwrap_or_else(|| {
+            println!("Warning: Could not get file_name from path: {}", root);
+            root.clone()
+        });
 
     let mut tree = ProjectNode {
         name: root_name,
@@ -308,187 +797,57 @@ fn open_project(root: String) -> Result<ProjectNode, String> {
         children: Vec::new(),
     };
 
-    // Use HashMap to build parent-child relationships
-    let mut node_map: HashMap<String, Vec<ProjectNode>> = HashMap::new();
-
-    for (name, path, is_dir) in entries.iter().rev() {
-        let parent = Path::new(path)
-            .parent()
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_default();
-
-        let children = node_map.remove(path).unwrap_or_default();
-
-        let node = ProjectNode {
-            name: name.clone(),
-            path: path.clone(),
-            is_dir: *is_dir,
-            children,
-        };
-
-        node_map.entry(parent).or_default().push(node);
-    }
-
-    // Get root children and sort them
-    if let Some(mut children) = node_map.remove(&root) {
-        children.sort_by(|a, b| {
-            b.is_dir
-                .cmp(&a.is_dir)
-                .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    // Convert entries to ProjectNodes
+    for (name, path, is_dir) in entries {
+        tree.children.push(ProjectNode {
+            name,
+            path,
+            is_dir,
+            children: Vec::new(), // Don't load children initially
         });
-        tree.children = children;
     }
 
+    // Add notification if project was truncated
+    if count >= MAX_ENTRIES {
+        tree.children.push(ProjectNode {
+            name: format!("... (truncated, showing first {} files)", MAX_ENTRIES),
+            path: root.clone(),
+            is_dir: false,
+            children: Vec::new(),
+        });
+    }
     Ok(tree)
 }
 
 /// Fuzzy file name search across project
 #[tauri::command]
 fn search_files(query: String, root: String, limit: usize) -> Vec<(String, String, i64)> {
-    use fuzzy_matcher::FuzzyMatcher;
-    use fuzzy_matcher::skim::SkimMatcherV2;
-    use ignore::WalkBuilder;
-
-    let matcher = SkimMatcherV2::default();
-    let mut results: Vec<(String, String, i64)> = Vec::new();
-
-    let walker = WalkBuilder::new(&root)
-        .hidden(true)
-        .ignore(true)
-        .git_ignore(true)
-        .build();
-
-    for entry in walker.flatten() {
-        let path = entry.path();
-        if path.is_file() {
-            let name = path
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_default();
-
-            if let Some(score) = matcher.fuzzy_match(&name, &query) {
-                let path_str = path.to_string_lossy().to_string();
-                results.push((name, path_str, score));
-            }
-        }
-    }
-
-    // Sort by score descending
-    results.sort_by(|a, b| b.2.cmp(&a.2));
-
-    // Limit results
-    results.truncate(limit.min(100));
-
-    results
+    kern_core::search_files(&query, &root, limit)
 }
 
-/// Content search result
-#[derive(serde::Serialize)]
-struct ContentMatch {
-    path: String,
-    line_number: usize,
-    line_content: String,
-}
-
-/// Search file contents (grep-style)
 #[tauri::command]
-fn search_content(query: String, root: String, limit: usize) -> Vec<ContentMatch> {
-    use ignore::WalkBuilder;
-    use std::fs::File;
-    use std::io::{BufRead, BufReader};
-
-    let mut results: Vec<ContentMatch> = Vec::new();
-    let query_lower = query.to_lowercase();
-
-    let walker = WalkBuilder::new(&root)
-        .hidden(true)
-        .ignore(true)
-        .git_ignore(true)
-        .build();
-
-    'outer: for entry in walker.flatten() {
-        let path = entry.path();
-        if path.is_file() {
-            // Skip binary files (simple check by extension)
-            let ext = path
-                .extension()
-                .map(|e| e.to_string_lossy().to_lowercase())
-                .unwrap_or_default();
-
-            let skip_exts = [
-                "png", "jpg", "jpeg", "gif", "ico", "woff", "woff2", "ttf", "eot", "pdf", "zip",
-                "tar", "gz", "exe", "dll", "so", "dylib", "node",
-            ];
-            if skip_exts.contains(&ext.as_str()) {
-                continue;
-            }
-
-            if let Ok(file) = File::open(path) {
-                let reader = BufReader::new(file);
-                for (line_num, line_result) in reader.lines().enumerate() {
-                    let line = match line_result {
-                        Ok(l) => l,
-                        Err(_) => continue,
-                    };
-
-                    if line.to_lowercase().contains(&query_lower) {
-                        results.push(ContentMatch {
-                            path: path.to_string_lossy().to_string(),
-                            line_number: line_num + 1,
-                            line_content: line.chars().take(200).collect(), // Limit line length
-                        });
-
-                        if results.len() >= limit.min(500) {
-                            break 'outer;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    results
+fn search_content(query: String, root: String, limit: usize) -> Vec<kern_core::ContentMatch> {
+    kern_core::search_content(&query, &root, limit)
 }
 
-/// File watcher state - stored globally for this prototype
-use std::sync::atomic::{AtomicBool, Ordering};
-static WATCHER_ACTIVE: AtomicBool = AtomicBool::new(false);
+
 
 /// Start watching a directory for changes
 #[tauri::command]
 fn watch_project(root: String, app_handle: tauri::AppHandle) -> Result<(), String> {
-    use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
+    use kern_core::ProjectWatcher;
     use std::time::Duration;
 
-    if WATCHER_ACTIVE.load(Ordering::SeqCst) {
+    if ProjectWatcher::is_active() {
         return Ok(()); // Already watching
     }
 
-    WATCHER_ACTIVE.store(true, Ordering::SeqCst);
-
-    let root_clone = root.clone();
+    let watcher = ProjectWatcher::new(&root)?;
 
     std::thread::spawn(move || {
-        let (tx, rx) = std::sync::mpsc::channel();
+        let rx = watcher.receiver;
 
-        let config = Config::default().with_poll_interval(Duration::from_secs(2));
-
-        let mut watcher: RecommendedWatcher = match Watcher::new(tx, config) {
-            Ok(w) => w,
-            Err(e) => {
-                eprintln!("Failed to create watcher: {}", e);
-                WATCHER_ACTIVE.store(false, Ordering::SeqCst);
-                return;
-            }
-        };
-
-        if let Err(e) = watcher.watch(Path::new(&root_clone), RecursiveMode::Recursive) {
-            eprintln!("Failed to watch directory: {}", e);
-            WATCHER_ACTIVE.store(false, Ordering::SeqCst);
-            return;
-        }
-
-        while WATCHER_ACTIVE.load(Ordering::SeqCst) {
+        while ProjectWatcher::is_active() {
             match rx.recv_timeout(Duration::from_millis(500)) {
                 Ok(result) => {
                     if let Ok(event) = result {
@@ -509,7 +868,7 @@ fn watch_project(root: String, app_handle: tauri::AppHandle) -> Result<(), Strin
             }
         }
 
-        WATCHER_ACTIVE.store(false, Ordering::SeqCst);
+        ProjectWatcher::stop();
     });
 
     Ok(())
@@ -518,5 +877,5 @@ fn watch_project(root: String, app_handle: tauri::AppHandle) -> Result<(), Strin
 /// Stop watching
 #[tauri::command]
 fn unwatch_project() {
-    WATCHER_ACTIVE.store(false, Ordering::SeqCst);
+    kern_core::ProjectWatcher::stop();
 }

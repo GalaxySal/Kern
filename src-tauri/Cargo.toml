@@ -1,40 +1,54 @@
 [package]
 name = "kern"
-version = "0.1.1"
+version = "0.1.2"
 license = "MIT"
 edition = "2024"
 
 [dependencies]
-kern-core = { version = "0.1.1", path = "../kern-core" }
-serde = { version = "1.0.228", features = ["derive"] }
+kern-core = { version = "0.1.2", path = "../kern-core" }
+serde = { version = "1.0", features = ["derive"] }
+git2 = { version = "0.20.3", features = ["zlib-ng-compat"] }
 serde_json = "1.0"
 portable-pty = "0.8"
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
-tauri-plugin-shell = "2"
 
 # Phase 2: Advanced Features
 walkdir = "2"
-ignore = "0.4"
-fuzzy-matcher = "0.3"
-notify = "6"
 lsp-types = "0.95"
 tokio = { version = "1", features = ["process", "io-util", "sync", "fs"] }
-rayon = "1.8"
+rayon = "1"
 grep-searcher = "0.1"
 grep-regex = "0.1"
 
 # Phase 3: Extension Management
-reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "rustls"] }
 sha2 = "0.10"
-zip = "2.2"
+zip = "2"
 dirs = "5"
 hex = "0.4"
+open = "5"
 chrono = "0.4"
 
 # Phase 7: Vibe Panel Production
+tauri-plugin-shell = "2"
 tauri-plugin-store = "2"
+tauri-plugin-localhost = "2"
+tauri-plugin-deep-link = "2"
+tauri-plugin-os = "2"
+tauri-plugin-persisted-scope = "2"
+dotenvy = "0.15"
+uuid = { version = "1", features = ["v4"] }
+urlencoding = "2"
+url = "2"
 futures-util = "0.3"
+tauri-plugin-mcp-bridge = "0.6.5"
+tauri-plugin-cors-fetch = "4"
+tauri-plugin-system-fonts = "2"
+tauri-plugin-google-auth = "0.3"
+tauri-plugin-i18n = "2"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+

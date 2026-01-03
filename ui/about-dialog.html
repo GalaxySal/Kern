@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About KERN</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+        .about-container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .about-header {
+            background-color: #2563eb;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .about-header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .about-content {
+            padding: 20px;
+        }
+        .about-logo {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .about-logo img {
+            width: 80px;
+            height: 80px;
+        }
+        .about-info {
+            margin-bottom: 20px;
+        }
+        .info-row {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .info-label {
+            font-weight: 600;
+            width: 150px;
+            color: #555;
+        }
+        .info-value {
+            flex: 1;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            word-break: break-all;
+        }
+        .about-footer {
+            text-align: center;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-top: 1px solid #eee;
+            font-size: 12px;
+            color: #666;
+        }
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+        .close-btn:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="about-container">
+        <div class="about-header">
+            <h1>About KERN</h1>
+            <button class="close-btn" id="close-about" onclick="window.closeAboutWindow()">×</button>
+        </div>
+        <div class="about-content">
+            <div class="about-logo">
+                <img src="/logo.svg" alt="KERN Logo" id="app-logo">
+            </div>
+            <div class="about-info">
+                <div class="info-row">
+                    <div class="info-label">KERN Version:</div>
+                    <div class="info-value" id="app-version">0.1.2</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Date:</div>
+                    <div class="info-value" id="build-date">2025-12-28T21:15:00.000Z</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Tauri:</div>
+                    <div class="info-value" id="tauri-version">2.9.5</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Rust:</div>
+                    <div class="info-value" id="rust-version">1.92.0 (Stable)</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">OS:</div>
+                    <div class="info-value" id="os-info">Loading...</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">WebView Engine:</div>
+                    <div class="info-value" id="webview-version">Loading...</div>
+                </div>
+            </div>
+        </div>
+        <div class="about-footer">
+            &copy; 2025 KERN Team. All rights reserved.
+        </div>
+    </div>
+
+    <script type="module" src="/src/about.js"></script>
+    <script type="module">
+        // Close button functionality
+        document.addEventListener('DOMContentLoaded', () => {
+            const closeButton = document.getElementById('close-about');
+            if (closeButton) {
+                closeButton.addEventListener('click', async () => {
+                    if (window.__TAURI__) {
+                        const { appWindow } = await import('@tauri-apps/api/window');
+                        appWindow.close();
+                    } else {
+                        window.close();
+                    }
+                });
+            }
+            
+            // Close on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    if (window.__TAURI__) {
+                        import('@tauri-apps/api/window').then(({ appWindow }) => {
+                            appWindow.close();
+                        });
+                    } else {
+                        window.close();
+                    }
+                }
+            });
+        });
+
+        // Set the current year in footer
+        const footer = document.querySelector('.about-footer');
+        if (footer) {
+            footer.textContent = `&copy; ${new Date().getFullYear()} KERN Team. All rights reserved.`;
+        }
+
+        // Function to get system info
+        async function getSystemInfo() {
+            if (!tauriApis.invoke) {
+                return getFallbackSystemInfo();
+            }
+            
+            try {
+                // Use invoke to call Tauri commands
+                const [osType, osVersion, arch, appVersion] = await Promise.all([
+                    tauriApis.invoke('get_os_type'),
+                    tauriApis.invoke('get_os_version'),
+                    tauriApis.invoke('get_arch'),
+                    tauriApis.invoke('get_app_version')
+                ]);
+                
+                return { 
+                    osName: osType || 'Unknown', 
+                    osVersion: osVersion || 'Unknown', 
+                    arch: arch || 'Unknown', 
+                    appVersion: appVersion || '0.1.2' 
+                };
+            } catch (error) {
+                console.error('Error getting system info:', error);
+                return {
+                    osName: 'Unknown',
+                    osVersion: 'Unknown',
+                    arch: 'Unknown',
+                    appVersion: '0.1.2'
+                };
+            }
+        }
+
+        // Get fallback system info when not in Tauri
+        function getFallbackSystemInfo() {
+            const userAgent = navigator.userAgent;
+            let osName = 'Unknown';
+            
+            if (userAgent.indexOf('Windows') !== -1) osName = 'Windows';
+            else if (userAgent.indexOf('Mac') !== -1) osName = 'macOS';
+            else if (userAgent.indexOf('Linux') !== -1) osName = 'Linux';
+            
+            return {
+                osName: osName,
+                osVersion: 'Unknown',
+                arch: navigator.platform,
+                appVersion: '0.1.2'
+            };
+        }
+        
+        // Main function to update the UI
+        async function updateUI() {
+            if (isTauri && tauriApis.invoke) {
+                try {
+                    const { osName, osVersion, arch } = await getSystemInfo();
+                    document.getElementById('os-info').textContent = `${osName} ${osVersion} (${arch})`;
+                    
+                    // Set WebView version based on OS
+                    if (osName.toLowerCase() === 'linux') {
+                        document.getElementById('webview-version').textContent = 'WebKit2GTK 2.50.4';
+                    } else {
+                        // For other OS, use the user agent as fallback
+                        const userAgent = navigator.userAgent;
+                        const webKitMatch = userAgent.match(/AppleWebKit\/([\d.]+)/);
+                        const chromeMatch = userAgent.match(/Chrome\/([\d.]+)/);
+                        
+                        if (osName.toLowerCase() === 'windows') {
+                            const edgeMatch = userAgent.match(/Edg\/([\d.]+)/);
+                            const webviewVersion = edgeMatch ? 
+                                `Microsoft Edge (Chromium) ${edgeMatch[1]}` : 
+                                (userAgent.includes('Trident/') || userAgent.includes('MSIE ') ? 
+                                    'Internet Explorer' : 
+                                    chromeMatch ? `Chromium ${chromeMatch[1]}` : 'Unknown');
+                            document.getElementById('webview-version').textContent = webviewVersion;
+                        } else if (osName.toLowerCase() === 'darwin') {
+                            const safariMatch = userAgent.match(/Version\/([\d.]+)/);
+                            const webviewVersion = safariMatch ? 
+                                `Safari WebKit ${safariMatch[1]}` : 
+                                (webKitMatch ? `WebKit ${webKitMatch[1]}` : 'Unknown');
+                            document.getElementById('webview-version').textContent = webviewVersion;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error updating UI:', error);
+                    document.getElementById('os-info').textContent = 'Unknown';
+                    document.getElementById('webview-version').textContent = 'Unknown';
+                }
+            } else {
+                // Fallback for browser
+                const userAgent = navigator.userAgent;
+                let osName = 'Unknown OS';
+                
+                if (userAgent.indexOf('Windows') !== -1) osName = 'Windows';
+                else if (userAgent.indexOf('Mac') !== -1) osName = 'macOS';
+                else if (userAgent.indexOf('Linux') !== -1) osName = 'Linux';
+                
+                document.getElementById('os-info').textContent = `${osName} (Browser)`;
+                
+                // Detect WebView in browser
+                const webKitMatch = userAgent.match(/AppleWebKit\/([\d.]+)/);
+                const chromeMatch = userAgent.match(/Chrome\/([\d.]+)/);
+                
+                if (webKitMatch) {
+                    document.getElementById('webview-version').textContent = `WebKit ${webKitMatch[1]}`;
+                } else if (chromeMatch) {
+                    document.getElementById('webview-version').textContent = `Chromium ${chromeMatch[1]}`;
+                } else {
+                    document.getElementById('webview-version').textContent = 'Unknown';
+                }
+            }
+        }
+
+        // Initialize the UI
+        updateUI();
+    </script>
+</body>
+</html>

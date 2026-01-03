@@ -1,0 +1,1 @@
+{"identifier": "github-oauth", "description": "GitHub OAuth window capabilities", "windows": ["github-oauth"], "permissions": ["core:default"]}

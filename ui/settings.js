@@ -2,6 +2,11 @@ import { load } from '@tauri-apps/plugin-store';
 import { invoke } from '@tauri-apps/api/core';
 
 export async function initSettings(appState) {
+    // Don't initialize settings in OAuth window
+    if (window.location.pathname === '/auth-success') {
+        return;
+    }
+
     const {
         modelSelect, customModelIdInput, customModelContainer,
         settingsView, settingsBtn, vibeSaveBtn

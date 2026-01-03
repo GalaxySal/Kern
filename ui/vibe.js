@@ -197,7 +197,7 @@ function handleVibeError(e, container, modelId, appState) {
         errorMsg = 'Exceeded cloud quota. <br><button onclick="switchToOllama()" class="bg-blue-600 px-2 py-1 rounded text-[10px] mt-2">Switch to Ollama</button>';
     }
 
-    container.innerHTML = `<div class=\"bg-red-900/40 p-3 rounded-lg text-red-100 text-xs text-center\">\n<strong class=\"block mb-1 text-sm\">${errorTitle}</strong>\n<span>${errorMsg}</span>\n</div>`;
+    container.innerHTML = `<div class="bg-red-900/40 p-3 rounded-lg text-red-100 text-xs text-center">\n<strong class="block mb-1 text-sm">${errorTitle}</strong>\n<span>${errorMsg}</span>\n</div>`;
     vibeInput.disabled = false;
     vibeSendBtn.disabled = false;
 }

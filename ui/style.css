@@ -1,1 +1,7 @@
 @import "tailwindcss";
+
+/* File Tree Styles */
+.folder-item { padding: 4px 16px; cursor: pointer; font-size: 12px; color: #60a5fa; }
+.file-item { padding: 4px 16px; cursor: pointer; font-size: 12px; color: #d1d5db; }
+.folder-item:hover, .file-item:hover { background-color: #2a2d2e; }
+.sub-folder { padding-left: 16px; }

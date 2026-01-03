@@ -1,13 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-
-
 import { open } from '@tauri-apps/plugin-dialog';
-// import { showAboutDialog } from './src/about.js';
-import { GitPanel } from './git-panel.js';
-
-// Import Simple LSP Client
-import SimpleLSPClient from './src/lsp/SimpleLSPClient.js';
 
 // Granular Monaco Imports (The Diet)
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
@@ -27,22 +20,13 @@ import 'monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution'
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
-import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker&inline';
+import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 
 // Make Terminal and FitAddon available globally for split terminal
 window.Terminal = Terminal;
 window.FitAddon = FitAddon;
 
-self.MonacoEnvironment = {
-    getWorker(_moduleId, _label) {
-        try {
-            return new editorWorker();
-        } catch (e) {
-            console.error('[Monaco] Failed to create worker:', e);
-            throw e;
-        }
-    }
-};
+self.MonacoEnvironment = { getWorker() { return new editorWorker(); } };
 
 // DOM & State
 const container = document.getElementById('editor-container');
@@ -54,9 +38,6 @@ const statusCursor = document.getElementById('status-cursor');
 
 let currentFilePath = null;
 let currentProjectRoot = null;
-
-// Initialize Simple LSP Client
-const lspClient = new SimpleLSPClient();
 
 // Initialize Editor
 const editor = monaco.editor.create(container, {
@@ -74,119 +55,6 @@ editor.onDidChangeCursorPosition((e) => {
 });
 
 editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => saveFile());
-
-// Git Branch Management
-let gitPanel = null;
-
-function updateGitBranch() {
-    if (!currentProjectRoot) return;
-
-    invoke('git_status', { repoPath: currentProjectRoot })
-        .then(status => {
-            const branchElement = document.getElementById('git-branch');
-            if (branchElement) {
-                const branchName = status.branch || 'Not a git repository';
-                branchElement.textContent = branchName;
-                branchElement.className = status.branch ? 'text-green-400' : 'text-gray-400';
-
-                // Update document title with branch name if in a git repo
-                if (status.branch && currentFilePath) {
-                    const fileName = currentFilePath.split('/').pop();
-                    document.title = `${fileName} (${branchName}) - Kern Editor`;
-                }
-            }
-
-            // Initialize Git panel if not already done
-            if (!gitPanel) {
-                gitPanel = new GitPanel();
-                setupGitMenu();
-            }
-        })
-        .catch(err => {
-            console.error('Git status error:', err);
-            const branchElement = document.getElementById('git-branch');
-            if (branchElement) {
-                branchElement.textContent = 'Not a git repository';
-                branchElement.className = 'text-gray-400';
-            }
-        });
-}
-
-// Setup Git menu
-function setupGitMenu() {
-    // Add Git menu item if it doesn't exist
-    if (!document.getElementById('menu-git')) {
-        const menuBar = document.getElementById('menubar');
-        const terminalMenu = document.querySelector('[data-menu="terminal"]').parentElement;
-
-        const gitMenu = document.createElement('div');
-        gitMenu.className = 'relative menu-container h-full';
-        gitMenu.id = 'menu-git';
-        gitMenu.innerHTML = `
-            <div class="menu-btn px-3 h-full flex items-center hover:bg-[#3c3c3c] cursor-pointer rounded-sm" data-menu="git">
-                Git
-            </div>
-            <ul id="dropdown-git" class="menu-dropdown hidden absolute top-full left-0 w-64 bg-[#252526] border border-[#454545] shadow-xl py-1 z-50 text-[#cccccc]">
-                <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer flex justify-between group" id="git-commit">
-                    <span>Commit</span>
-                    <span class="text-xs text-gray-500 group-hover:text-white">Ctrl+Enter</span>
-                </li>
-                <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer" id="git-pull">
-                    Pull
-                </li>
-                <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer" id="git-push">
-                    Push
-                </li>
-                <li class="px-4 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer" id="git-branches">
-                    Branches...
-                </li>
-            </ul>
-        `;
-
-        menuBar.insertBefore(gitMenu, terminalMenu.nextSibling);
-
-        // Add event listeners for Git menu items
-        document.getElementById('git-commit')?.addEventListener('click', () => {
-            const commitMessage = prompt('Enter commit message:');
-            if (commitMessage) {
-                invoke('git_commit', {
-                    repoPath: currentProjectRoot,
-                    message: commitMessage
-                }).then(() => {
-                    updateGitBranch();
-                    gitPanel?.refresh();
-                }).catch(console.error);
-            }
-        });
-
-        document.getElementById('git-pull')?.addEventListener('click', () => {
-            gitPanel?.pull();
-        });
-
-        document.getElementById('git-push')?.addEventListener('click', () => {
-            gitPanel?.push();
-        });
-
-        document.getElementById('git-branches')?.addEventListener('click', () => {
-            // Focus the branch dropdown in the Git panel
-            const branchSelect = document.querySelector('#git-branch-select');
-            if (branchSelect) {
-                branchSelect.focus();
-                branchSelect.click(); // Open dropdown
-            }
-        });
-
-        document.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                const activeElement = document.activeElement;
-                if (activeElement && activeElement.id === 'git-commit-message') {
-                    gitPanel?.commit();
-                    e.preventDefault();
-                }
-            }
-        });
-    }
-}
 
 // Core Actions
 async function saveFile() {
@@ -221,212 +89,44 @@ async function updateEditor(content, path, filename) {
 
     monaco.editor.setModelLanguage(editor.getModel(), lang);
     if (statusLang) statusLang.innerText = `{ } ${lang}`;
-
-    // Start LSP support for this file
-    if (currentProjectRoot) {
-        await lspClient.startLanguageServer(path, editor);
-        updateLSPStatus(lang, true);
-    }
 }
 
 async function openDirectory() {
     try {
-        // For VS Code-like behavior, try directory picker first
-        console.log('Trying directory picker for VS Code-like experience...');
-        const selectedDir = await open({
-            directory: true,
-            multiple: false
-        });
-
-        console.log('Directory picker result:', selectedDir);
-
-        const selectedDirPath = Array.isArray(selectedDir) ? selectedDir[0] : selectedDir;
-
-        // If directory picker works (returns any valid path)
-        if (selectedDirPath && selectedDirPath !== '') {
-            console.log('✅ Directory picker worked! Opening:', selectedDirPath);
-
-            try {
-                const root = await invoke('open_project', { root: selectedDirPath });
-                console.log('open_project returned for directory:', root);
-                console.log('Project root path:', root.path);
-
-                currentProjectRoot = root.path;
-                renderTree(root.children, fileTreeEl);
-
-                // Update status bar
-                statusName.textContent = selectedDirPath.split('/').pop();
-
-                // Update git branch and refresh Git panel
-                await updateGitBranch();
-
-                // Initialize Git panel if it doesn't exist
-                if (!gitPanel) {
-                    gitPanel = new GitPanel();
-                    gitPanel.setPath(currentProjectRoot);
-                    setupGitMenu();
-                } else {
-                    gitPanel.setPath(currentProjectRoot);
-                    gitPanel.refresh();
-                }
-
-                console.log('✅ Project opened successfully:', selectedDirPath);
-                return; // Exit after successful directory open
-            } catch (e) {
-                console.error('Error opening directory directly:', e);
-                // Fall through to file-based method
-            }
-        }
-
-        // Fallback to file-based method if directory open fails
-        const useFileMethod = confirm(`📁 Open Project Folder
-
-VS Code allows opening folders directly, but this system's folder picker has limitations.
-
-Current options:
-• Select ANY FILE from the desired folder (works for empty folders too)
-• Or enter folder path manually
-
-Select a file from your project folder?`);
-
-        if (useFileMethod) {
-            // File-based approach (works for empty folders)
-            alert('Select any file from the project folder you want to open.\n\nFor empty folders: create a temporary file first, or use manual path entry.');
-
-            const selectedFile = await open({
-                multiple: false,
-                defaultPath: await invoke('get_home_dir')
-            });
-
-            if (selectedFile && selectedFile.length > 0) {
-                const filePath = selectedFile[0];
-                const dirPath = filePath.substring(0, filePath.lastIndexOf('/'));
-
-                console.log('Selected file:', filePath);
-                console.log('Extracted directory:', dirPath);
-
-                if (dirPath === '' || dirPath === '/') {
-                    alert('❌ Cannot open system directories.\n\nPlease select a file in your user directory.');
-                    return;
-                }
-
-                console.log('Calling open_project with file-based path:', dirPath);
-                const root = await invoke('open_project', { root: dirPath });
-                console.log('open_project returned for file-based:', root);
-                console.log('Project root path:', root.path);
-
-                currentProjectRoot = root.path;
-                renderTree(root.children, fileTreeEl);
-                console.log('✅ Project opened successfully:', dirPath);
-            }
-        } else {
-            // Manual path entry (for advanced users)
-            const manualPath = prompt('Enter project folder path manually:', await invoke('get_home_dir'));
-            if (manualPath && manualPath.trim()) {
-                try {
-                    console.log('Calling open_project with manual path:', manualPath.trim());
-                    const root = await invoke('open_project', { root: manualPath.trim() });
-                    console.log('open_project returned for manual path:', root);
-                    console.log('Project root path:', root.path);
-
-                    currentProjectRoot = root.path;
-                    currentProjectRoot = root.path;
-                    renderTree(root.children, fileTreeEl);
-
-                    // Update Git Panel
-                    await updateGitBranch();
-                    if (!gitPanel) {
-                        gitPanel = new GitPanel();
-                        gitPanel.setPath(currentProjectRoot);
-                        setupGitMenu();
-                    } else {
-                        gitPanel.setPath(currentProjectRoot);
-                        gitPanel.refresh();
-                    }
-
-                    console.log('✅ Project opened manually:', manualPath.trim());
-                } catch (e) {
-                    alert('❌ Failed to open folder: ' + e);
-                }
-            }
+        const selected = await invoke('show_folder_picker');
+        if (selected && typeof selected === 'string') {
+            const root = await invoke('open_project', { root: selected });
+            currentProjectRoot = root.path;
+            renderTree(root.children, fileTreeEl);
         }
     } catch (e) {
         if (!e.message?.includes('callback id')) {
-            console.warn('❌ Open folder failed:', e);
+            console.warn('Open folder failed:', e);
         }
     }
 }
 
-function renderTree(entries, parentElement, depth = 0) {
-    if (depth > 5) {
-        parentElement.innerHTML = '<div class="text-gray-500 text-xs px-4 py-1">... (depth limit reached)</div>';
-        return;
-    }
-
+function renderTree(entries, parentElement) {
     parentElement.innerHTML = '';
     entries.sort((a, b) => (b.is_dir - a.is_dir) || a.name.localeCompare(b.name)).forEach(entry => {
         const div = document.createElement('div');
-        div.className = entry.is_dir ? 'folder-item' : 'file-item';
+        div.className = `flex items-center space-x-2 px-4 py-1 cursor-pointer hover:bg-[#2a2d2e] transition-colors text-xs ${entry.is_dir ? 'text-blue-300' : 'text-gray-300'}`;
         div.innerHTML = `<span>${entry.is_dir ? '📁' : '📄'}</span> <span>${entry.name}</span>`;
         if (!entry.is_dir) div.onclick = () => openFile(entry.path);
         else {
             let expanded = false;
             div.onclick = async () => {
-                if (div.dataset.loading === "true") return;
-                try {
-                    div.dataset.loading = "true";
-                    expanded = !expanded;
-                    if (expanded) {
-                        console.log('Expanding folder:', entry.name, 'at path:', entry.path);
-                        const sub = document.createElement('div');
-                        sub.className = 'sub-folder';
-                        div.after(sub);
-                        const updated = await invoke('readDir', { path: entry.path });
-                        console.log('Read directory result:', updated);
-                        renderTree(updated, sub, depth + 1);
-                    } else {
-                        if (div.nextElementSibling) div.nextElementSibling.remove();
-                    }
-                } catch (e) {
-                    console.error("Folder expansion error for", entry.path, ":", e);
-                } finally {
-                    div.dataset.loading = "false";
-                }
+                expanded = !expanded;
+                if (expanded) {
+                    const sub = document.createElement('div');
+                    sub.className = 'pl-4';
+                    div.after(sub);
+                    const updated = await invoke('readDir', { path: entry.path });
+                    renderTree(updated, sub);
+                } else div.nextElementSibling?.remove();
             };
         }
         parentElement.appendChild(div);
-    });
-}
-
-// Sidebar Toggles
-const gitToggleBtn = document.getElementById('git-panel-toggle');
-const explorerToggleBtn = document.getElementById('explorer-panel-toggle');
-const explorerPanel = document.getElementById('explorer-panel');
-const gitPanelEl = document.getElementById('git-panel');
-
-if (gitToggleBtn) {
-    gitToggleBtn.addEventListener('click', (e) => {
-        e.stopPropagation(); // Prevent bubbling
-        if (explorerPanel) explorerPanel.classList.add('hidden');
-        if (gitPanelEl) {
-            gitPanelEl.classList.remove('hidden');
-            // Initialize Git panel if needed
-            if (!gitPanel) {
-                gitPanel = new GitPanel();
-                if (currentProjectRoot) gitPanel.setPath(currentProjectRoot);
-                setupGitMenu();
-            } else {
-                gitPanel.refresh();
-            }
-        }
-    });
-}
-
-if (explorerToggleBtn) {
-    explorerToggleBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (gitPanelEl) gitPanelEl.classList.add('hidden');
-        if (explorerPanel) explorerPanel.classList.remove('hidden');
     });
 }
 
@@ -437,13 +137,16 @@ document.getElementById('action-open-file')?.addEventListener('click', async () 
     try {
         const selected = await open({
             multiple: false,
-            defaultPath: await invoke('get_home_dir')
+            filters: [{
+                name: 'All Files',
+                extensions: ['*']
+            }]
         });
-
+        
         if (selected && selected.length > 0) {
             await openFile(selected[0]);
         }
-    } catch (e) {
+    } catch (e) { 
         if (!e.message?.includes('callback id')) {
             console.warn('Open file failed:', e);
         }
@@ -527,12 +230,12 @@ document.getElementById('action-go-file')?.addEventListener('click', async () =>
     try {
         const selected = await open({
             multiple: false,
-            defaultPath: await invoke('get_home_dir')
+            filters: [{ name: 'All Files', extensions: ['*'] }]
         });
         if (selected && selected.length > 0) {
             await openFile(selected[0]);
         }
-    } catch (e) {
+    } catch (e) { 
         if (!e.message?.includes('callback id')) {
             console.warn('Go to file failed:', e);
         }
@@ -561,7 +264,7 @@ document.getElementById('action-start-debug')?.addEventListener('click', () => {
 document.getElementById('action-new-terminal')?.addEventListener('click', async () => {
     try {
         await invoke('spawn_terminal');
-    } catch (e) {
+    } catch (e) { 
         if (!e.message?.includes('callback id')) {
             console.warn('New terminal failed:', e);
         }
@@ -577,14 +280,8 @@ document.getElementById('action-welcome')?.addEventListener('click', () => {
     alert('Welcome to KERN Editor!\n\nFeatures:\n• File editing with Monaco Editor\n• Terminal integration\n• AI Assistant (Vibe)\n• Project explorer\n• Multiple language support');
 });
 
-document.getElementById('action-about')?.addEventListener('click', async () => {
-    try {
-        await import('./src/about.js').then(module => {
-            module.showAboutDialog();
-        });
-    } catch (error) {
-        console.error('Failed to load about dialog:', error);
-    }
+document.getElementById('action-about')?.addEventListener('click', () => {
+    alert('KERN Editor v0.1.1\n\nA modern, lightweight code editor built with Tauri and Monaco Editor.\n\n© 2025 KERN Project');
 });
 
 // Menu Dropdown Functionality
@@ -593,12 +290,12 @@ document.querySelectorAll('.menu-btn').forEach(btn => {
         e.stopPropagation();
         const menuId = btn.getAttribute('data-menu');
         const dropdown = document.getElementById(`dropdown-${menuId}`);
-
+        
         // Close all other dropdowns
         document.querySelectorAll('.menu-dropdown').forEach(d => {
             if (d !== dropdown) d.classList.add('hidden');
         });
-
+        
         // Toggle current dropdown
         dropdown?.classList.toggle('hidden');
     });
@@ -621,10 +318,10 @@ const termContainer = document.getElementById('panel-content-terminal');
 let terminalInitialized = false;
 
 async function initTerminal() {
-    if (terminalInitialized || window.location.pathname === '/auth-success') return;
-
-    const term = new Terminal({
-        theme: {
+    if (terminalInitialized) return;
+    
+    const term = new Terminal({ 
+        theme: { 
             background: '#1e1e1e',
             foreground: '#cccccc',
             cursor: '#ffffff',
@@ -645,7 +342,7 @@ async function initTerminal() {
             brightMagenta: '#d670d6',
             brightCyan: '#29b8db',
             brightWhite: '#e5e5e5'
-        },
+        }, 
         fontSize: 12,
         fontFamily: 'Cascadia Code, Consolas, "Ubuntu Mono", monospace',
         cursorBlink: true,
@@ -655,20 +352,18 @@ async function initTerminal() {
         cols: 80,
         rows: 24
     });
-
+    
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.open(termContainer);
     fitAddon.fit();
-
+    
     // Handle terminal data from backend
-    if (window.location.pathname !== '/auth-success' && !window.location.href.includes('github-oauth')) {
-        await listen('term-data', (e) => term.write(e.payload));
-    }
-
+    await listen('term-data', (e) => term.write(e.payload));
+    
     // Handle user input
     term.onData(data => invoke('write_to_terminal', { data }));
-
+    
     // Handle terminal resize
     const resizeTerminal = () => {
         fitAddon.fit();
@@ -679,17 +374,17 @@ async function initTerminal() {
             }
         });
     };
-
+    
     // Initial resize
     resizeTerminal();
-
+    
     // Handle window resize
     window.addEventListener('resize', resizeTerminal);
-
+    
     // Handle panel resize (when terminal panel is shown/hidden)
     const observer = new ResizeObserver(resizeTerminal);
     observer.observe(termContainer);
-
+    
     try {
         await invoke('spawn_terminal');
         terminalInitialized = true;
@@ -703,7 +398,7 @@ async function initTerminal() {
 function initTerminalTabs() {
     const tabs = {
         'tab-problems': 'panel-content-problems',
-        'tab-output': 'panel-content-output',
+        'tab-output': 'panel-content-output', 
         'tab-debug': 'panel-content-debug',
         'tab-terminal': 'panel-content-terminal',
         'tab-ports': 'panel-content-ports'
@@ -712,24 +407,24 @@ function initTerminalTabs() {
     Object.keys(tabs).forEach(tabId => {
         const tab = document.getElementById(tabId);
         const panel = document.getElementById(tabs[tabId]);
-
+        
         tab?.addEventListener('click', () => {
             // Hide all panels
             Object.values(tabs).forEach(panelId => {
                 const p = document.getElementById(panelId);
                 p?.classList.add('hidden');
             });
-
+            
             // Remove active styling from all tabs
             Object.keys(tabs).forEach(tId => {
                 const t = document.getElementById(tId);
                 t?.classList.remove('text-gray-200', 'font-medium', 'border-b', 'border-white');
                 t?.classList.add('text-gray-500', 'border-b', 'border-transparent');
             });
-
+            
             // Show selected panel
             panel?.classList.remove('hidden');
-
+            
             // Add active styling to selected tab
             tab.classList.remove('text-gray-500', 'border-transparent');
             tab.classList.add('text-gray-200', 'font-medium', 'border-white');
@@ -742,16 +437,16 @@ async function loadUserPorts() {
     try {
         const ports = await invoke('get_user_ports');
         const tbody = document.getElementById('ports-table-body');
-
+        
         if (!tbody) return;
-
+        
         tbody.innerHTML = '';
-
+        
         if (ports.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">No active ports found</td></tr>';
             return;
         }
-
+        
         ports.forEach(port => {
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-[#2a2d2e]';
@@ -786,7 +481,7 @@ setInterval(() => {
 document.getElementById('btn-term-new')?.addEventListener('click', async () => {
     try {
         await invoke('spawn_terminal');
-    } catch (e) {
+    } catch (e) { 
         if (!e.message?.includes('callback id')) {
             console.warn('New terminal failed:', e);
         }
@@ -804,7 +499,7 @@ document.getElementById('btn-term-kill')?.addEventListener('click', async () => 
             terminalInitialized = false;
             initTerminal();
         }
-    } catch (e) {
+    } catch (e) { 
         if (!e.message?.includes('callback id')) {
             console.warn('Kill terminal failed:', e);
         }
@@ -842,7 +537,7 @@ let splitTerminals = [];
 document.getElementById('btn-term-split')?.addEventListener('click', async () => {
     try {
         const terminalId = await invoke('split_terminal');
-
+        
         // Create new terminal container for split view
         const terminalContainer = document.getElementById('panel-content-terminal');
         if (terminalContainer) {
@@ -853,7 +548,7 @@ document.getElementById('btn-term-split')?.addEventListener('click', async () =>
                 splitContainer.style.display = 'flex';
                 splitContainer.style.gap = '1px';
                 splitContainer.style.backgroundColor = '#1e1e1e';
-
+                
                 // Move existing terminal to split container
                 const existingTerminal = terminalContainer.querySelector('.xterm');
                 if (existingTerminal) {
@@ -862,10 +557,10 @@ document.getElementById('btn-term-split')?.addEventListener('click', async () =>
                     firstPane.appendChild(existingTerminal);
                     splitContainer.appendChild(firstPane);
                 }
-
+                
                 terminalContainer.appendChild(splitContainer);
             }
-
+            
             // Add new terminal pane
             const splitContainer = terminalContainer.querySelector('.split-container');
             if (splitContainer) {
@@ -873,12 +568,12 @@ document.getElementById('btn-term-split')?.addEventListener('click', async () =>
                 newPane.className = 'flex-1';
                 newPane.innerHTML = `<div id="terminal-${terminalId}" class="h-full"></div>`;
                 splitContainer.appendChild(newPane);
-
+                
                 // Initialize new terminal
                 const newTermContainer = document.getElementById(`terminal-${terminalId}`);
                 if (newTermContainer) {
-                    const term = new Terminal({
-                        theme: {
+                    const term = new Terminal({ 
+                        theme: { 
                             background: '#1e1e1e',
                             foreground: '#cccccc',
                             cursor: '#ffffff',
@@ -890,18 +585,16 @@ document.getElementById('btn-term-split')?.addEventListener('click', async () =>
                         cursorStyle: 'block',
                         scrollback: 10000
                     });
-
+                    
                     const fitAddon = new FitAddon();
                     term.loadAddon(fitAddon);
                     term.open(newTermContainer);
                     fitAddon.fit();
-
+                    
                     // Listen for split terminal data
-                    if (window.location.pathname !== '/auth-success' && !window.location.href.includes('github-oauth')) {
-                        await listen('term-data-split', (e) => term.write(e.payload));
-                    }
+                    await listen('term-data-split', (e) => term.write(e.payload));
                     term.onData(data => invoke('write_to_terminal', { data }));
-
+                    
                     // Handle resize
                     const resizeTerminal = () => {
                         fitAddon.fit();
@@ -912,12 +605,12 @@ document.getElementById('btn-term-split')?.addEventListener('click', async () =>
                             }
                         });
                     };
-
+                    
                     setTimeout(resizeTerminal, 100);
                 }
             }
         }
-    } catch (e) {
+    } catch (e) { 
         if (!e.message?.includes('callback id')) {
             console.warn('Split terminal failed:', e);
         }
@@ -962,7 +655,7 @@ function initDebugConsole() {
                 </div>
             </div>
         `;
-
+        
         // Add debug input functionality
         const debugInput = document.getElementById('debug-input');
         if (debugInput) {
@@ -976,16 +669,16 @@ function initDebugConsole() {
                         commandDiv.className = 'text-green-400 mb-1';
                         commandDiv.textContent = `> ${command}`;
                         outputContent.appendChild(commandDiv);
-
+                        
                         // Process command (placeholder)
                         const resultDiv = document.createElement('div');
                         resultDiv.className = 'text-gray-300 mb-2';
                         resultDiv.textContent = `Debug command "${command}" not implemented yet`;
                         outputContent.appendChild(resultDiv);
-
+                        
                         // Clear input
                         e.target.value = '';
-
+                        
                         // Scroll to bottom
                         debugContainer.scrollTop = debugContainer.scrollHeight;
                     }
@@ -995,42 +688,36 @@ function initDebugConsole() {
     }
 }
 
-// Update LSP status in status bar
-function updateLSPStatus(language, active) {
-    const lspStatus = document.getElementById('lsp-status');
-    if (lspStatus) {
-        lspStatus.textContent = active ? `LSP: ${language}` : 'LSP: Off';
-        lspStatus.className = active ? 'text-green-400' : 'text-gray-500';
-    }
-}
-
-// Add LSP status to status bar if not exists
-function addLSPStatusIndicator() {
-    const statusBar = document.getElementById('status-bar-container');
-    if (statusBar && !document.getElementById('lsp-status')) {
-        const rightSection = statusBar.querySelector('.flex.items-center.h-full.space-x-4:last-child');
-        if (rightSection) {
-            const lspStatus = document.createElement('div');
-            lspStatus.id = 'lsp-status';
-            lspStatus.className = 'hover:bg-[#ffffff20] px-2 h-full flex items-center cursor-pointer text-gray-500';
-            lspStatus.textContent = 'LSP: Off';
-            lspStatus.title = 'Language Server Protocol Status';
-            rightSection.insertBefore(lspStatus, rightSection.firstChild);
-        }
-    }
-}
-
-// Initialize LSP status indicator
-addLSPStatusIndicator();
-
 // Initialize all tabs
 initProblemsTab();
 initOutputTab();
 initDebugConsole();
 
+// Enhanced tab switching with content initialization
+const originalTabSwitching = initTerminalTabs;
+initTerminalTabs = function() {
+    originalTabSwitching();
+    
+    // Initialize content when tabs are first clicked
+    document.getElementById('tab-problems')?.addEventListener('click', function initOnce() {
+        initProblemsTab();
+        this.removeEventListener('click', initOnce);
+    });
+    
+    document.getElementById('tab-output')?.addEventListener('click', function initOnce() {
+        initOutputTab();
+        this.removeEventListener('click', initOnce);
+    });
+    
+    document.getElementById('tab-debug')?.addEventListener('click', function initOnce() {
+        initDebugConsole();
+        this.removeEventListener('click', initOnce);
+    });
+};
+
 // Console logging to Output tab
 const originalConsoleLog = console.log;
-console.log = function (...args) {
+console.log = function(...args) {
     originalConsoleLog(...args);
     const outputContainer = document.getElementById('panel-content-output');
     if (outputContainer) {
@@ -1046,91 +733,8 @@ console.log = function (...args) {
 initTerminalTabs();
 initTerminal();
 
-// GitHub Auth Handler
-async function handleGitHubAuthCallback() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
-    const userParam = urlParams.get('user');
-
-    if (token && userParam) {
-        try {
-            const user = JSON.parse(decodeURIComponent(userParam));
-            localStorage.setItem('github_token', token);
-            localStorage.setItem('github_user', JSON.stringify(user));
-
-            // Clean up URL
-            window.history.replaceState({}, document.title, window.location.pathname);
-
-            // Update UI
-            console.log('GitHub authentication successful:', user.login);
-
-            // Force UI update by dispatching a custom event
-            window.dispatchEvent(new CustomEvent('github-auth-success', { detail: { token, user } }));
-
-        } catch (error) {
-            console.error('Failed to handle GitHub auth callback:', error);
-        }
-    }
-}
-
-// Listen for Tauri auth events only in main window
-if (window.__TAURI__ && window.location.pathname !== '/auth-success' && !window.location.href.includes('github-oauth')) {
-    listen('auth-success', (event) => {
-        console.log('Received auth success event from Tauri:', event.payload);
-        const { token, user } = event.payload;
-        localStorage.setItem('github_token', token);
-        localStorage.setItem('github_user', JSON.stringify(user));
-
-        // Force UI update
-        window.dispatchEvent(new CustomEvent('github-auth-success', { detail: { token, user } }));
-    });
-}
-
-// Listen for postMessage from OAuth window
-window.addEventListener('message', (event) => {
-    if (event.data && event.data.type === 'github-auth-success') {
-        console.log('Received auth data via postMessage:', event.data);
-        const { token, user } = event.data;
-        localStorage.setItem('github_token', token);
-        localStorage.setItem('github_user', JSON.stringify(user));
-
-        // Force UI update
-        window.dispatchEvent(new CustomEvent('github-auth-success', { detail: { token, user } }));
-    }
-});
-
-// Also check for temp localStorage items (fallback method) - check more frequently
-setInterval(() => {
-    const tempToken = localStorage.getItem('github_token_temp');
-    const tempUser = localStorage.getItem('github_user_temp');
-
-    if (tempToken && tempUser) {
-        console.log('Found temp auth data in localStorage');
-        localStorage.setItem('github_token', tempToken);
-        localStorage.setItem('github_user', tempUser);
-        localStorage.removeItem('github_token_temp');
-        localStorage.removeItem('github_user_temp');
-
-        try {
-            const user = JSON.parse(tempUser);
-            console.log('Parsed user data:', user);
-            window.dispatchEvent(new CustomEvent('github-auth-success', { detail: { token: tempToken, user } }));
-        } catch (e) {
-            console.error('Failed to parse temp user data:', e);
-        }
-    }
-}, 500); // Check every 500ms instead of 1000ms
-
-// Handle auth callback on page load
-handleGitHubAuthCallback();
-
 // Bootstrap Lazy Modules
 async function bootstrap() {
-    // Don't initialize modules in OAuth window
-    if (window.location.pathname === '/auth-success') {
-        return;
-    }
-
     const vibe = await import('./vibe.js');
     const settings = await import('./settings.js');
 

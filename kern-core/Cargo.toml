@@ -1,8 +1,18 @@
 [package]
 name = "kern-core"
-version = "0.1.1"
-edition = "2021"
+version = "0.1.2"
+edition = "2024"
 
 [dependencies]
-ropey = "1.6"
-thiserror = "1.0"
+# Metin ve Hata Motoru (The Brain)
+ropey = "1.6.1"       
+thiserror = "2.0"     
+
+# Arama ve Navigasyon (The Senses)
+ignore = "0.4.25"     
+fuzzy-matcher = "0.3.7"  # Akıllı Arama (Güncel) ✅
+rayon = "1.11.0"      
+
+# Sistem ve İzleme (The Reflexes)
+notify = "8.2.0"
+serde = { version = "1.0", features = ["derive"] }
