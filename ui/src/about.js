@@ -5,75 +5,39 @@ let aboutDialog = null;
 // Tauri 2.0 APIs - Using our native commands which wrap tauri-plugin-os
 const getPlatformInfo = async () => {
     try {
-        if (window.__TAURI__) {
+        const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
+        if (isTauri) {
             const { invoke } = await import('@tauri-apps/api/core');
-            const platform = await invoke('get_os_type');
-            const version = await invoke('get_os_version');
-            const arch = await invoke('get_arch');
+            const platform = await invoke('getOsType');
+            const version = await invoke('getOsVersion');
+            const arch = await invoke('getArch');
             return { platform, version, arch };
         } else {
             return { platform: 'Web', version: '', arch: 'unknown' };
         }
     } catch (error) {
-        console.warn('Error getting platform info:', error);
+        console.error('Error getting platform info:', error);
         return { platform: 'Unknown', version: '', arch: 'unknown' };
     }
 };
 
 const getWebviewInfo = async () => {
     try {
-        if (window.__TAURI__) {
+        const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
+        if (isTauri) {
             const { invoke } = await import('@tauri-apps/api/core');
-            return await invoke('get_webview_version');
+            return await invoke('getWebviewVersion');
         }
         return 'Browser WebView';
     } catch (error) {
+        console.error('Error getting webview info:', error);
         return 'Unknown WebView';
     }
 };
 
-// Browser fallback for platform detection
-const getBrowserPlatformInfo = () => {
-    const ua = navigator.userAgent;
-    let platform = 'unknown';
-    let version = '';
-    let arch = 'unknown';
+// Browser fallback for platform detection removed (dead code)
 
-    if (ua.includes('Windows')) {
-        platform = 'win32';
-        const match = ua.match(/Windows NT ([\d.]+)/);
-        version = match ? match[1] : '';
-    } else if (ua.includes('Mac OS X') || ua.includes('Macintosh')) {
-        platform = 'darwin';
-        const match = ua.match(/Mac OS X ([\d_]+)/);
-        version = match ? match[1].replace(/_/g, '.') : '';
-    } else if (ua.includes('Linux')) {
-        platform = 'linux';
-        version = '';
-    }
-
-    // Detect architecture
-    if (ua.includes('x86_64') || ua.includes('Win64') || ua.includes('WOW64')) {
-        arch = 'x86_64';
-    } else if (ua.includes('ARM') || ua.includes('aarch64')) {
-        arch = 'aarch64';
-    }
-
-    return { platform, version, arch };
-};
-
-// App version fallback
-const getAppVersion = async () => {
-    if (window.__TAURI__) {
-        try {
-            const { getVersion } = await import('@tauri-apps/api/app');
-            return await getVersion();
-        } catch (e) {
-            console.warn('Could not get app version:', e);
-        }
-    }
-    return '0.1.2';
-};
+// App version fallback removed (dead code)
 
 // Create and show the about dialog
 export async function showAboutDialog() {
@@ -191,7 +155,8 @@ async function updateSystemInfo() {
     const webviewInfo = document.getElementById('webview-info');
 
     try {
-        if (window.__TAURI__) {
+        const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
+        if (isTauri) {
             try {
                 const { platform: osName, version: osVersion, arch: architecture } = await getPlatformInfo();
 
@@ -204,12 +169,12 @@ async function updateSystemInfo() {
                     webviewInfo.textContent = await getWebviewInfo();
                 }
             } catch (error) {
-                console.warn('Error getting system info:', error);
+                console.error('Error getting system info:', error);
                 if (osInfo) {
-                    osInfo.textContent = 'Unknown OS';
+                    osInfo.textContent = 'Unknown (Native Error)';
                 }
                 if (webviewInfo) {
-                    webviewInfo.textContent = 'Unknown WebView';
+                    webviewInfo.textContent = 'Unknown (Native Error)';
                 }
             }
         } else {
@@ -223,6 +188,9 @@ async function updateSystemInfo() {
 
                 osInfo.textContent = `${osName} (Web)`;
             }
+            if (webviewInfo) {
+                webviewInfo.textContent = 'Browser (Web Mode)';
+            }
         }
     } catch (error) {
         console.error('Error in updateSystemInfo:', error);
@@ -231,7 +199,7 @@ async function updateSystemInfo() {
 
 // Initialize when the DOM is fully loaded
 function initializeAboutDialog() {
-    const aboutButton = document.getElementById('menu-about');
+    const aboutButton = document.getElementById('action-about');
     if (aboutButton) {
         // Remove any existing event listeners to prevent duplicates
         const newButton = aboutButton.cloneNode(true);

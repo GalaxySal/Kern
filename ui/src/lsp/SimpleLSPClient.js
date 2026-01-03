@@ -88,7 +88,7 @@ class SimpleLSPClient {
     );
   }
 
-  async startLanguageServer(filePath, editor) {
+  async startLanguageServer(filePath, _editor) {
     const language = this.detectLanguage(filePath);
     if (!language) return;
 

@@ -1,5 +1,4 @@
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
-import * as vscode from 'vscode-languageclient/node';
 
 class LSPClient {
   constructor() {
@@ -111,7 +110,7 @@ class LSPClient {
     };
   }
 
-  async createWebLanguageClient(serverOptions, clientOptions) {
+  async createWebLanguageClient(serverOptions, _clientOptions) {
     // For web version, use direct WebSocket or stdio communication
     // This is a simplified version - real implementation would need proper WebSocket handling
     return {
@@ -124,7 +123,7 @@ class LSPClient {
 
   connectEditorToServer(editor, language) {
     // Set up Monaco editor to work with LSP
-    const model = editor.getModel();
+    editor.getModel();
 
     // Clear existing providers to avoid duplicates
     monaco.languages.setLanguageConfiguration(language, {
@@ -148,7 +147,7 @@ class LSPClient {
 
     // Configure Monaco for LSP integration
     const completionProvider = monaco.languages.registerCompletionItemProvider(language, {
-      provideCompletionItems: async (model, position, context, token) => {
+      provideCompletionItems: async (model, position, _context, _token) => {
         try {
           // Get word at position for context
           const word = model.getWordUntilPosition(position);
@@ -178,7 +177,7 @@ class LSPClient {
     });
 
     const hoverProvider = monaco.languages.registerHoverProvider(language, {
-      provideHover: async (model, position, token) => {
+      provideHover: async (model, position, _token) => {
         try {
           const word = model.getWordAtPosition(position);
           if (word) {
@@ -204,7 +203,7 @@ class LSPClient {
     });
 
     const definitionProvider = monaco.languages.registerDefinitionProvider(language, {
-      provideDefinition: async (model, position, token) => {
+      provideDefinition: async (model, position, _token) => {
         try {
           const word = model.getWordAtPosition(position);
           if (word) {
@@ -220,9 +219,12 @@ class LSPClient {
       }
     });
 
-    provideSignatureHelp: async (_model, _position, _token, _context) => {
-      return null;
-    }
+    const signatureHelpProvider = monaco.languages.registerSignatureHelpProvider(language, {
+      signatureHelpTriggerCharacters: ['(', ','],
+      provideSignatureHelp: async (_model, _position, _token, _context) => {
+        return null;
+      }
+    });
 
     // Store providers for cleanup
     if (!this.providers) {

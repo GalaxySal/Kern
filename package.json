@@ -8,7 +8,7 @@
     "dev": "npm run dev --prefix ui",
     "build": "npm run build --prefix ui",
     "lint": "eslint .",
-    "tauri": "WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 npx tauri",
+    "tauri": "npx tauri",
     "auth": "node server/auth.js"
   },
   "devDependencies": {

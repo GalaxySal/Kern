@@ -3,9 +3,8 @@ import { resolve } from 'path'
 import tailwindcss from '@tailwindcss/vite'
 
 // Tauri configuration
-const isTauri = process.env.TAURI_ENV_PLATFORM !== undefined;
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode: _mode }) => ({
     base: './', // Ensure relative paths for Tauri production
     plugins: [
         tailwindcss(),

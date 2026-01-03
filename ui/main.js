@@ -216,7 +216,7 @@ async function updateEditor(content, path, filename) {
     if (!['rust', 'javascript', 'typescript', 'plaintext'].includes(lang)) {
         try {
             await import(/* @vite-ignore */ `monaco-editor/esm/vs/basic-languages/${lang}/${lang}.contribution`);
-        } catch (e) { console.warn(`Lang ${lang} lazy-load failed.`); }
+        } catch { console.warn(`Lang ${lang} lazy-load failed.`); }
     }
 
     monaco.editor.setModelLanguage(editor.getModel(), lang);
@@ -837,7 +837,6 @@ document.getElementById('btn-term-close')?.addEventListener('click', () => {
 });
 
 // Split Terminal functionality
-let splitTerminals = [];
 
 document.getElementById('btn-term-split')?.addEventListener('click', async () => {
     try {

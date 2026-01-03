@@ -3,8 +3,8 @@ import { listen } from '@tauri-apps/api/event';
 
 export async function initVibe(appState) {
     const {
-        vibePanel, vibeInput, vibeSendBtn, vibeChatHistory,
-        modelSelect, customModelIdInput, settingsView,
+        vibePanel, vibeInput, vibeSendBtn,
+        modelSelect, customModelIdInput,
         vibeToggleBtn, closeVibeBtn
     } = appState.elements;
 

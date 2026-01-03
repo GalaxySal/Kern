@@ -1,1 +1,16 @@
-{"identifier": "main", "description": "Main application capabilities", "windows": ["main"], "permissions": ["core:default", "shell:allow-open", "store:default"]}
+{
+    "version": 1,
+    "identifier": "main-capability",
+    "description": "Main window capabilities",
+    "windows": [
+        "main"
+    ],
+    "permissions": [
+        "shell:allow-open",
+        "store:default",
+        "dialog:default",
+        "dialog:allow-open",
+        "fs:default",
+        "allow-all"
+    ]
+}

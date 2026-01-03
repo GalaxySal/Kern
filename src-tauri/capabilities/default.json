@@ -1,1 +1,22 @@
-{"identifier": "default", "description": "Default permissions for the app", "local": true, "windows": ["main", "github-oauth"], "permissions": ["core:default", "core:event:default", "core:window:default", "core:window:allow-destroy", "store:default", "shell:default", "shell:allow-open"]}
+{
+    "version": 1,
+    "identifier": "default",
+    "description": "Capabilities for the main window",
+    "windows": [
+        "main"
+    ],
+    "permissions": [
+        "core:path:default",
+        "core:event:default",
+        "core:window:default",
+        "core:app:default",
+        "core:resources:default",
+        "core:menu:default",
+        "core:tray:default",
+        "shell:allow-open",
+        "dialog:default",
+        "dialog:allow-open",
+        "fs:default",
+        "allow-all"
+    ]
+}
