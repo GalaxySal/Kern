@@ -486,8 +486,8 @@ pub fn run() {
         .setup(|app| {
             use tauri_plugin_deep_link::DeepLinkExt;
 
-            // Register the kern:// protocol at runtime for Linux compatibility
-            #[cfg(unix)]
+            // Register the kern:// protocol at runtime for Windows and Linux compatibility
+            #[cfg(any(windows, target_os = "linux"))]
             let _ = app.deep_link().register("kern");
 
             app.deep_link().on_open_url(|event| {
