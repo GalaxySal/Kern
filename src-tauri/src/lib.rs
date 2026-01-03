@@ -485,6 +485,11 @@ pub fn run() {
         .plugin(tauri_plugin_persisted_scope::init())
         .setup(|app| {
             use tauri_plugin_deep_link::DeepLinkExt;
+
+            // Register the kern:// protocol at runtime for Linux compatibility
+            #[cfg(unix)]
+            let _ = app.deep_link().register("kern");
+
             app.deep_link().on_open_url(|event| {
                 for url in event.urls() {
                     let url_str = url.to_string();
