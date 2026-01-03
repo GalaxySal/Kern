@@ -489,7 +489,7 @@ pub fn run() {
 
     builder
         /* tauri-plugin-deep-link causes 'state() called before manage()' panic on Linux.
-           We disable it on Linux/Windows and use manual argv/single-instance instead. */
+        We disable it on Linux/Windows and use manual argv/single-instance instead. */
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             println!("Second instance started with argv: {:?}", argv);
             let _ = app
@@ -672,7 +672,7 @@ async fn authenticate_github(_app_handle: tauri::AppHandle) -> Result<AuthRespon
             let val = res.map_err(|_| "Failed to receive OAuth callback".to_string())?;
             println!("Received callback URL: {}", val);
             val
-        },
+        }
         Err(_) => {
             println!("Error: OAuth timeout reached after 300s");
             let mut tx_guard = AUTH_TX.lock().unwrap();
@@ -683,14 +683,15 @@ async fn authenticate_github(_app_handle: tauri::AppHandle) -> Result<AuthRespon
 
     println!("Parsing callback URL...");
     // Parse URL to get code
-    let url = url::Url::parse(&url_str).map_err(|e| format!("Failed to parse callback URL: {}", e))?;
+    let url =
+        url::Url::parse(&url_str).map_err(|e| format!("Failed to parse callback URL: {}", e))?;
     let code_pair = url.query_pairs().find(|(key, _)| key == "code");
 
     let code = match code_pair {
         Some((_, code)) => {
             println!("Code extracted successfully.");
             code.to_string()
-        },
+        }
         None => {
             println!("Error: No OAuth code found in callback URL");
             return Err("No OAuth code received in parsed URL".to_string());
@@ -731,7 +732,10 @@ async fn authenticate_github(_app_handle: tauri::AppHandle) -> Result<AuthRespon
     let access_token = token_data["access_token"]
         .as_str()
         .ok_or_else(|| {
-            println!("Error: No access_token in GitHub response: {:?}", token_data);
+            println!(
+                "Error: No access_token in GitHub response: {:?}",
+                token_data
+            );
             "No access token in response".to_string()
         })?
         .to_string();
@@ -755,7 +759,10 @@ async fn authenticate_github(_app_handle: tauri::AppHandle) -> Result<AuthRespon
         e.to_string()
     })?;
 
-    println!("GitHub Authentication successful for user: {}", user_data.login);
+    println!(
+        "GitHub Authentication successful for user: {}",
+        user_data.login
+    );
 
     Ok(AuthResponse {
         token: access_token,
