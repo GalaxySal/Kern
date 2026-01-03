@@ -2,42 +2,39 @@
 
 let aboutDialog = null;
 
+// Use the global window.__TAURI__.invoke which is more reliable for dynamically loaded scripts
+// In Tauri 2.0, withGlobalTauri exposes it at window.__TAURI__.core.invoke
+const invoke = window.__TAURI__ ? (window.__TAURI__.core ? window.__TAURI__.core.invoke : window.__TAURI__.invoke) : null;
+
 // Tauri 2.0 APIs - Using our native commands which wrap tauri-plugin-os
 const getPlatformInfo = async () => {
     try {
-        const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
-        if (isTauri) {
-            const { invoke } = await import('@tauri-apps/api/core');
-            const platform = await invoke('getOsType');
-            const version = await invoke('getOsVersion');
-            const arch = await invoke('getArch');
+        if (invoke) {
+            const platform = await invoke('get_os_type');
+            const version = await invoke('get_os_version');
+            const arch = await invoke('get_arch');
             return { platform, version, arch };
         } else {
+            console.warn('[About] invoke not found');
             return { platform: 'Web', version: '', arch: 'unknown' };
         }
     } catch (error) {
-        console.error('Error getting platform info:', error);
+        console.error('[About] Error calling platform commands:', error);
         return { platform: 'Unknown', version: '', arch: 'unknown' };
     }
 };
 
 const getWebviewInfo = async () => {
     try {
-        const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
-        if (isTauri) {
-            const { invoke } = await import('@tauri-apps/api/core');
-            return await invoke('getWebviewVersion');
+        if (invoke) {
+            return await invoke('get_webview_version');
         }
         return 'Browser WebView';
     } catch (error) {
-        console.error('Error getting webview info:', error);
+        console.error('[About] Error calling get_webview_version:', error);
         return 'Unknown WebView';
     }
 };
-
-// Browser fallback for platform detection removed (dead code)
-
-// App version fallback removed (dead code)
 
 // Create and show the about dialog
 export async function showAboutDialog() {
@@ -75,7 +72,7 @@ export async function showAboutDialog() {
                         </div>
                         <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee;">
                             <span style="font-weight: 500;">Date</span>
-                            <span>2025-12-28</span>
+                            <span>2026-01-03</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee;">
                             <span style="font-weight: 500;">Tauri</span>
@@ -95,9 +92,9 @@ export async function showAboutDialog() {
                         </div>
                     </div>
                     <div style="text-align: center; color: #666; margin-bottom: 20px;">
-                        <p>KERN is a modern code editor built with web technologies.</p>
-                        <p> 2025 KERN Team. All rights reserved.</p>
-                        <p style="font-size: 0.9em; color: #666;">OS and WebView Engine versions are detected from the user's system.</p>
+                        <p>Kern is a high-performance, extensible code editor engineered for speed and precision, leveraging modern web standards and native acceleration.</p>
+                        <p>© 2026 Kern Project Contributors. All rights reserved.</p>
+                        <p style="font-size: 0.9em; color: #666;">System architecture and runtime environment information are retrieved directly from the host operating system.</p>
                     </div>
                     <div style="text-align: center;">
                         <button id="ok-button" style="padding: 8px 24px; background-color: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer;">OK</button>
@@ -195,31 +192,4 @@ async function updateSystemInfo() {
     } catch (error) {
         console.error('Error in updateSystemInfo:', error);
     }
-}
-
-// Initialize when the DOM is fully loaded
-function initializeAboutDialog() {
-    const aboutButton = document.getElementById('action-about');
-    if (aboutButton) {
-        // Remove any existing event listeners to prevent duplicates
-        const newButton = aboutButton.cloneNode(true);
-        aboutButton.parentNode.replaceChild(newButton, aboutButton);
-
-        // Add click event listener
-        newButton.addEventListener('click', async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            await showAboutDialog();
-        });
-
-        console.log('About dialog button initialized');
-    } else {
-        console.warn('About menu button not found. Make sure you have an element with id="menu-about"');
-    }
-}
-
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeAboutDialog);
-} else {
-    initializeAboutDialog();
 }

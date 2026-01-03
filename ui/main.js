@@ -86,13 +86,14 @@ function updateGitBranch() {
             const branchElement = document.getElementById('git-branch');
             if (branchElement) {
                 const branchName = status.branch || 'Not a git repository';
-                branchElement.textContent = branchName;
-                branchElement.className = status.branch ? 'text-green-400' : 'text-gray-400';
+                const dirtyIndicator = status.is_dirty ? '*' : '';
+                branchElement.textContent = status.branch ? `${status.branch}${dirtyIndicator}` : branchName;
+                branchElement.className = status.branch ? 'text-white' : 'text-gray-400 opacity-70';
 
                 // Update document title with branch name if in a git repo
                 if (status.branch && currentFilePath) {
                     const fileName = currentFilePath.split('/').pop();
-                    document.title = `${fileName} (${branchName}) - Kern Editor`;
+                    document.title = `${fileName} (${status.branch}${dirtyIndicator}) - Kern Editor`;
                 }
             }
 
@@ -107,7 +108,7 @@ function updateGitBranch() {
             const branchElement = document.getElementById('git-branch');
             if (branchElement) {
                 branchElement.textContent = 'Not a git repository';
-                branchElement.className = 'text-gray-400';
+                branchElement.className = 'text-gray-400 opacity-70';
             }
         });
 }
@@ -202,7 +203,9 @@ async function openFile(path) {
         const filename = path.split(/[\\/]/).pop();
         currentFilePath = path;
         updateEditor(content, path, filename);
-        statusName.innerText = filename;
+        if (statusName) {
+            statusName.innerText = filename;
+        }
     } catch (e) { alert('Open failed: ' + e); }
 }
 
@@ -255,7 +258,9 @@ async function openDirectory() {
                 renderTree(root.children, fileTreeEl);
 
                 // Update status bar
-                statusName.textContent = selectedDirPath.split('/').pop();
+                if (statusName) {
+                    statusName.textContent = selectedDirPath.split('/').pop();
+                }
 
                 // Update git branch and refresh Git panel
                 await updateGitBranch();
@@ -274,7 +279,12 @@ async function openDirectory() {
                 return; // Exit after successful directory open
             } catch (e) {
                 console.error('Error opening directory directly:', e);
-                // Fall through to file-based method
+                // If it's a restricted directory error, alert the user prominently
+                if (typeof e === 'string' && e.includes('Restricted directory')) {
+                    alert('Security Restriction: ' + e);
+                    return;
+                }
+                // Fall through to file-based method for other errors
             }
         }
 
@@ -456,7 +466,9 @@ document.getElementById('action-save-file')?.addEventListener('click', saveFile)
 document.getElementById('action-new-file')?.addEventListener('click', () => {
     currentFilePath = null;
     editor.setValue('// New file');
-    statusName.innerText = 'Untitled';
+    if (statusName) {
+        statusName.innerText = 'Untitled';
+    }
 });
 
 document.getElementById('action-open-folder')?.addEventListener('click', openDirectory);

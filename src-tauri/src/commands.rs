@@ -1,5 +1,5 @@
-use tauri::command;
 use std::process::Command;
+use tauri::command;
 
 #[command]
 pub fn get_os_type() -> String {
@@ -37,7 +37,7 @@ pub fn get_webview_version() -> String {
             return format!("WebKitGTK {}", v.trim());
         }
     }
-    
+
     // Fallback for other platforms
     format!("Native WebView ({})", tauri_plugin_os::platform())
 }

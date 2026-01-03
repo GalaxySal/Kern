@@ -1,9 +1,9 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use serde::{Deserialize, Serialize};
 use tauri::{Emitter, State};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,7 +34,7 @@ impl LSPManager {
 
     pub async fn start_server(&self, config: LSPServerConfig) -> Result<(), String> {
         let mut servers = self.servers.lock().map_err(|_| "Failed to lock servers")?;
-        
+
         // Check if server is already running
         if servers.contains_key(&config.language) {
             return Ok(());
@@ -56,7 +56,7 @@ impl LSPManager {
             .map_err(|e| format!("Failed to start LSP server: {}", e))?;
 
         let pid = child.id();
-        
+
         let server_instance = LSPServerInstance {
             config: config.clone(),
             child: Some(child),
@@ -64,38 +64,43 @@ impl LSPManager {
         };
 
         servers.insert(config.language.clone(), server_instance);
-        
+
         // Start monitoring the server
         self.monitor_server(config.language.clone());
-        
-        println!("LSP server started for {} with PID: {}", config.language, pid);
+
+        println!(
+            "LSP server started for {} with PID: {}",
+            config.language, pid
+        );
         Ok(())
     }
 
     pub fn stop_server(&self, language: &str) -> Result<(), String> {
         let mut servers = self.servers.lock().map_err(|_| "Failed to lock servers")?;
-        
+
         if let Some(server) = servers.remove(language) {
             if let Some(mut child) = server.child {
-                child.kill().map_err(|e| format!("Failed to kill LSP server: {}", e))?;
+                child
+                    .kill()
+                    .map_err(|e| format!("Failed to kill LSP server: {}", e))?;
             }
             println!("LSP server stopped for {}", language);
         }
-        
+
         Ok(())
     }
 
     pub fn stop_all_servers(&self) -> Result<(), String> {
         if let Ok(servers) = self.servers.lock() {
             let languages: Vec<String> = servers.keys().cloned().collect();
-            
+
             drop(servers); // Release the lock before stopping servers
-            
+
             for language in languages {
                 let _ = self.stop_server(&language);
             }
         }
-        
+
         Ok(())
     }
 
@@ -111,13 +116,13 @@ impl LSPManager {
         thread::spawn(move || {
             // Monitor the server process
             thread::sleep(Duration::from_secs(2));
-            
+
             // In a real implementation, this would:
             // 1. Read stdout/stderr for LSP messages
             // 2. Parse JSON-RPC messages
             // 3. Handle LSP protocol communication
             // 4. Emit events to the frontend
-            
+
             println!("Monitoring LSP server for {}", language);
         });
     }
@@ -125,12 +130,12 @@ impl LSPManager {
     pub fn get_server_status(&self) -> HashMap<String, bool> {
         if let Ok(servers) = self.servers.lock() {
             let mut status = HashMap::new();
-            
+
             for (language, server) in servers.iter() {
                 let is_running = server.pid.is_some();
                 status.insert(language.clone(), is_running);
             }
-            
+
             status
         } else {
             HashMap::new()

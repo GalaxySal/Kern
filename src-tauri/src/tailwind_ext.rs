@@ -5,7 +5,9 @@
 // Thin wrapper around kern_core::tailwind
 // ============================================
 
-use kern_core::tailwind::{TailwindCompletions, TailwindWatcher, scan_css_files, get_default_utilities};
+use kern_core::tailwind::{
+    TailwindCompletions, TailwindWatcher, get_default_utilities, scan_css_files,
+};
 use std::time::Duration;
 use tauri::Emitter;
 

@@ -1,25 +1,25 @@
 use kern_core::Document;
-use tauri::Manager;
 use portable_pty::{CommandBuilder, NativePtySystem, PtyPair, PtySize, PtySystem};
 use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use tauri::Manager;
 static AUTH_TX: Mutex<Option<tokio::sync::oneshot::Sender<String>>> = Mutex::new(None);
 use tauri::{Emitter, State};
 
 // Import system information commands
 mod commands;
-use commands::{get_os_type, get_os_version, get_arch, get_app_version, get_webview_version};
+use commands::{get_app_version, get_arch, get_os_type, get_os_version, get_webview_version};
 
 mod ai_client;
 
 mod extension_manager;
+mod git_operations;
 mod lsp_manager;
 mod tailwind_ext;
-mod git_operations;
 
-use lsp_manager::{start_lsp_server, stop_lsp_server, get_lsp_status, restart_lsp_server};
+use lsp_manager::{get_lsp_status, restart_lsp_server, start_lsp_server, stop_lsp_server};
 
 pub struct AppState {
     pub document: Mutex<Option<Document>>,
@@ -81,9 +81,9 @@ async fn read_dir(path: String) -> Result<Vec<FileNode>, String> {
             Some(home) => home.to_string_lossy().to_string(),
             None => ".".to_string(),
         }
-    } else { path.clone() };
-
-
+    } else {
+        path.clone()
+    };
 
     // Path validation
     let path_obj = std::path::Path::new(&read_path);
@@ -94,7 +94,9 @@ async fn read_dir(path: String) -> Result<Vec<FileNode>, String> {
         return Err(format!("Path is not a directory: {}", read_path));
     }
 
-    let mut read_result = tokio::fs::read_dir(read_path).await.map_err(|e| e.to_string())?;
+    let mut read_result = tokio::fs::read_dir(read_path)
+        .await
+        .map_err(|e| e.to_string())?;
     let mut count = 0;
     const MAX_ENTRIES: usize = 1000;
 
@@ -107,8 +109,6 @@ async fn read_dir(path: String) -> Result<Vec<FileNode>, String> {
         let is_dir = path_buf.is_dir();
         let name = entry.file_name().to_string_lossy().to_string();
         let path_str = path_buf.to_string_lossy().to_string();
-
-
 
         entries.push(FileNode {
             name,
@@ -191,7 +191,7 @@ fn spawn_terminal(state: State<AppState>, app_handle: tauri::AppHandle) -> Resul
     });
 
     let cmd = CommandBuilder::new(&shell);
-    
+
     // Don't use login shell flags to avoid extra prompts
     // Just start the shell in interactive mode
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
@@ -253,16 +253,13 @@ fn write_to_terminal(data: String, state: State<AppState>) -> Result<(), String>
 #[tauri::command]
 fn get_user_ports() -> Result<Vec<PortInfo>, String> {
     use std::process::Command;
-    
+
     let output = if cfg!(target_os = "windows") {
-        Command::new("netstat")
-            .args(["-ano"])
-            .output()
+        Command::new("netstat").args(["-ano"]).output()
     } else {
-        Command::new("netstat")
-            .args(["-tulpn"])
-            .output()
-    }.map_err(|e| format!("Failed to run netstat: {}", e))?;
+        Command::new("netstat").args(["-tulpn"]).output()
+    }
+    .map_err(|e| format!("Failed to run netstat: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut ports = Vec::new();
@@ -275,16 +272,17 @@ fn get_user_ports() -> Result<Vec<PortInfo>, String> {
                 if parts.len() >= 5 {
                     let address = parts[1];
                     if let Some(port_str) = address.split(':').next_back()
-                        && let Ok(port) = port_str.parse::<u16>() {
-                            let pid = parts.get(4).unwrap_or(&"?");
-                            let process_name = get_process_name(pid);
-                            ports.push(PortInfo {
-                                port,
-                                protocol: "TCP".to_string(),
-                                process: process_name,
-                                local_address: format!("localhost:{}", port),
-                            });
-                        }
+                        && let Ok(port) = port_str.parse::<u16>()
+                    {
+                        let pid = parts.get(4).unwrap_or(&"?");
+                        let process_name = get_process_name(pid);
+                        ports.push(PortInfo {
+                            port,
+                            protocol: "TCP".to_string(),
+                            process: process_name,
+                            local_address: format!("localhost:{}", port),
+                        });
+                    }
                 }
             }
         } else {
@@ -294,16 +292,18 @@ fn get_user_ports() -> Result<Vec<PortInfo>, String> {
                 if parts.len() >= 7 {
                     let address = parts[3];
                     if let Some(port_str) = address.split(':').next_back()
-                        && let Ok(port) = port_str.parse::<u16>() {
-                            let process_info = parts.get(6).unwrap_or(&"?");
-                            let (process, _) = process_info.split_once('/').unwrap_or((process_info, ""));
-                            ports.push(PortInfo {
-                                port,
-                                protocol: parts[0].to_uppercase(),
-                                process: process.to_string(),
-                                local_address: format!("localhost:{}", port),
-                            });
-                        }
+                        && let Ok(port) = port_str.parse::<u16>()
+                    {
+                        let process_info = parts.get(6).unwrap_or(&"?");
+                        let (process, _) =
+                            process_info.split_once('/').unwrap_or((process_info, ""));
+                        ports.push(PortInfo {
+                            port,
+                            protocol: parts[0].to_uppercase(),
+                            process: process.to_string(),
+                            local_address: format!("localhost:{}", port),
+                        });
+                    }
                 }
             }
         }
@@ -312,7 +312,7 @@ fn get_user_ports() -> Result<Vec<PortInfo>, String> {
     // Sort by port number and remove duplicates
     ports.sort_by_key(|p| p.port);
     ports.dedup_by_key(|p| p.port);
-    
+
     Ok(ports)
 }
 
@@ -329,18 +329,21 @@ fn get_process_name(pid: &str) -> String {
     if std::env::consts::OS == "windows" {
         // Inline the Windows logic to avoid cfg issues
         use std::process::Command;
-        
+
         if pid == "?" || pid.is_empty() {
             return "Unknown".to_string();
         }
-        
+
         match Command::new("tasklist")
             .args(["/FI", &format!("PID eq {}", pid), "/FO", "CSV", "/NH"])
-            .output() {
+            .output()
+        {
             Ok(output) => {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 if let Some(line) = stdout.lines().next() {
-                    line.split(',').next().unwrap_or("Unknown")
+                    line.split(',')
+                        .next()
+                        .unwrap_or("Unknown")
                         .trim_matches('"')
                         .to_string()
                 } else {
@@ -361,10 +364,12 @@ fn kill_terminal(state: State<AppState>) -> Result<(), String> {
         let mut child_guard = state.pty_child.lock().map_err(|_| "Failed to lock child")?;
         if let Some(mut child) = child_guard.take() {
             // Use the Child trait's kill method directly
-            child.kill().map_err(|e| format!("Failed to kill process: {}", e))?;
+            child
+                .kill()
+                .map_err(|e| format!("Failed to kill process: {}", e))?;
         }
     }
-    
+
     // Clear writer
     {
         let mut writer_guard = state
@@ -373,21 +378,24 @@ fn kill_terminal(state: State<AppState>) -> Result<(), String> {
             .map_err(|_| "Failed to lock writer")?;
         *writer_guard = None;
     }
-    
+
     // Clear pair
     {
         let mut pair_guard = state.pty_pair.lock().map_err(|_| "Failed to lock pair")?;
         *pair_guard = None;
     }
-    
+
     Ok(())
 }
 
 #[tauri::command]
 fn split_terminal(state: State<AppState>, app_handle: tauri::AppHandle) -> Result<usize, String> {
-    let mut terminals_guard = state.terminals.lock().map_err(|_| "Failed to lock terminals")?;
+    let mut terminals_guard = state
+        .terminals
+        .lock()
+        .map_err(|_| "Failed to lock terminals")?;
     let terminal_id = terminals_guard.len();
-    
+
     // Create new terminal instance
     let pty_system = NativePtySystem::default();
     let pair = pty_system
@@ -409,7 +417,7 @@ fn split_terminal(state: State<AppState>, app_handle: tauri::AppHandle) -> Resul
     });
 
     let cmd = CommandBuilder::new(&shell);
-    
+
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
     let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
@@ -445,12 +453,14 @@ fn split_terminal(state: State<AppState>, app_handle: tauri::AppHandle) -> Resul
 fn resize_terminal(rows: u16, cols: u16, state: State<AppState>) -> Result<(), String> {
     let pair_guard = state.pty_pair.lock().map_err(|_| "Failed to lock pair")?;
     if let Some(pair) = pair_guard.as_ref() {
-        pair.master.resize(PtySize {
-            rows,
-            cols,
-            pixel_width: 0,
-            pixel_height: 0,
-        }).map_err(|e| format!("Terminal resize failed: {}", e))?;
+        pair.master
+            .resize(PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .map_err(|e| format!("Terminal resize failed: {}", e))?;
     }
     Ok(())
 }
@@ -541,15 +551,15 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 let app_handle = window.app_handle();
                 let state = app_handle.state::<AppState>();
-                
+
                 println!("Close requested - cleaned up and exiting...");
-                
+
                 // 1. Stop all LSP servers gracefully
                 let _ = state.lsp_manager.stop_all_servers();
-                
-                // Note: PTY processes and WebKit processes are automatically killed 
+
+                // Note: PTY processes and WebKit processes are automatically killed
                 // when the parent process exits via std::process::exit(0).
-                
+
                 app_handle.exit(0);
                 std::process::exit(0);
             }
@@ -573,32 +583,30 @@ pub struct GitHubUser {
 #[tauri::command]
 async fn authenticate_github(_app_handle: tauri::AppHandle) -> Result<AuthResponse, String> {
     use reqwest::Client;
-    
+
     let _ = dotenvy::dotenv();
-    
-    let client_id = std::env::var("GITHUB_CLIENT_ID")
-        .unwrap_or_else(|_| {
-            println!("Warning: GITHUB_CLIENT_ID not found in env, using fallback");
-            "Ov23li8kiy5bB9tLd13g".to_string() 
-        });
-    let client_secret = std::env::var("GITHUB_CLIENT_SECRET")
-        .unwrap_or_else(|_| {
-            println!("Warning: GITHUB_CLIENT_SECRET not found in env, using fallback");
-            "e0952d431c009941a27e73541459a95729792015".to_string()
-        });
-    
+
+    let client_id = std::env::var("GITHUB_CLIENT_ID").unwrap_or_else(|_| {
+        println!("Warning: GITHUB_CLIENT_ID not found in env, using fallback");
+        "Ov23li8kiy5bB9tLd13g".to_string()
+    });
+    let client_secret = std::env::var("GITHUB_CLIENT_SECRET").unwrap_or_else(|_| {
+        println!("Warning: GITHUB_CLIENT_SECRET not found in env, using fallback");
+        "e0952d431c009941a27e73541459a95729792015".to_string()
+    });
+
     // Create a channel to receive the callback URL
     let (tx, rx) = tokio::sync::oneshot::channel::<String>();
     {
         let mut tx_guard = AUTH_TX.lock().unwrap();
         *tx_guard = Some(tx);
     }
-    
+
     let state = uuid::Uuid::new_v4().to_string();
 
     // Use kern://auth-callback as the deep link protocol
     let redirect_uri = "kern://auth-callback";
-    
+
     let auth_url = format!(
         "https://github.com/login/oauth/authorize?client_id={}&scope=repo&redirect_uri={}&state={}",
         client_id,
@@ -608,7 +616,7 @@ async fn authenticate_github(_app_handle: tauri::AppHandle) -> Result<AuthRespon
 
     println!("Opening auth URL: {}", auth_url);
     shell_open(auth_url)?;
-    
+
     // Wait for the callback with a timeout
     let url_str = match tokio::time::timeout(std::time::Duration::from_secs(300), rx).await {
         Ok(res) => res.map_err(|_| "Failed to receive OAuth callback".to_string())?,
@@ -618,11 +626,11 @@ async fn authenticate_github(_app_handle: tauri::AppHandle) -> Result<AuthRespon
             return Err("OAuth timeout reached".to_string());
         }
     };
-    
+
     // Parse URL to get code
     let url = url::Url::parse(&url_str).map_err(|_| "Failed to parse callback URL".to_string())?;
     let code_pair = url.query_pairs().find(|(key, _)| key == "code");
-    
+
     let code = match code_pair {
         Some((_, code)) => code.to_string(),
         None => return Err("No OAuth code received in parsed URL".to_string()),
@@ -630,7 +638,8 @@ async fn authenticate_github(_app_handle: tauri::AppHandle) -> Result<AuthRespon
 
     // Exchange code for token
     let client = Client::new();
-    let token_resp = client.post("https://github.com/login/oauth/access_token")
+    let token_resp = client
+        .post("https://github.com/login/oauth/access_token")
         .header("Accept", "application/json")
         .json(&serde_json::json!({
             "client_id": client_id,
@@ -647,12 +656,14 @@ async fn authenticate_github(_app_handle: tauri::AppHandle) -> Result<AuthRespon
         return Err(error.as_str().unwrap_or("Unknown OAuth error").to_string());
     }
 
-    let access_token = token_data["access_token"].as_str()
+    let access_token = token_data["access_token"]
+        .as_str()
         .ok_or("No access token in response")?
         .to_string();
 
     // Get user info
-    let user_resp = client.get("https://api.github.com/user")
+    let user_resp = client
+        .get("https://api.github.com/user")
         .header("Authorization", format!("token {}", access_token))
         .header("User-Agent", "Kern-Editor")
         .send()
@@ -748,16 +759,38 @@ struct ProjectNode {
 #[tauri::command]
 async fn open_project(root: String) -> Result<ProjectNode, String> {
     use tokio::fs;
-    
+
     let root_path = Path::new(&root);
     if !root_path.exists() {
         return Err(format!("Path does not exist: {}", root));
     }
 
-    // Temporarily disabled security check for testing folder opening
+    // Security: Block sensitive system directories on Linux/Unix
+    if cfg!(unix) {
+        let path_str = root_path.to_string_lossy();
+        let blocked_paths = [
+            "/", "/etc", "/bin", "/sbin", "/proc", "/sys", "/usr/bin", "/usr/sbin", "/var", "/dev",
+            "/boot", "/root",
+        ];
 
-    // Allow opening directories even if they're empty (unlike VS Code which requires at least one file)
-    // We'll show an empty tree for empty directories
+        if blocked_paths.contains(&path_str.as_ref()) {
+            return Err(format!(
+                "Restricted directory: '{}' is a system path and cannot be opened as a project.",
+                path_str
+            ));
+        }
+
+        // Additional check: Don't allow opening direct subdirectories of / if they are typical system dirs
+        if path_str.starts_with('/') && path_str.split('/').filter(|s| !s.is_empty()).count() <= 1 {
+            let top_dir = path_str.trim_start_matches('/');
+            if blocked_paths.iter().any(|p| p.trim_start_matches('/') == top_dir) {
+                 return Err(format!(
+                    "Restricted directory: '{}' is a system path and cannot be opened as a project.",
+                    path_str
+                ));
+            }
+        }
+    }
 
     // Simple directory reading for testing
     let mut entries: Vec<(String, String, bool)> = Vec::new();
@@ -766,12 +799,12 @@ async fn open_project(root: String) -> Result<ProjectNode, String> {
 
     // Read immediate directory contents first
     let mut dir_entries = fs::read_dir(&root).await.map_err(|e| e.to_string())?;
-    
+
     while let Some(entry) = dir_entries.next_entry().await.map_err(|e| e.to_string())? {
         if count >= MAX_ENTRIES {
             break;
         }
-        
+
         let path = entry.path();
         let path_str = path.to_string_lossy().to_string();
         let name = entry.file_name().to_string_lossy().to_string();
@@ -829,8 +862,6 @@ fn search_files(query: String, root: String, limit: usize) -> Vec<(String, Strin
 fn search_content(query: String, root: String, limit: usize) -> Vec<kern_core::ContentMatch> {
     kern_core::search_content(&query, &root, limit)
 }
-
-
 
 /// Start watching a directory for changes
 #[tauri::command]

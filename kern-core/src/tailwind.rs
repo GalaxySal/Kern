@@ -1,9 +1,9 @@
+use ignore::WalkBuilder;
+use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use ignore::WalkBuilder;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
-use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 
 static TAILWIND_WATCHER_ACTIVE: AtomicBool = AtomicBool::new(false);
 
@@ -131,12 +131,36 @@ pub fn get_default_utilities() -> Vec<TailwindCompletion> {
         ("grow-0", "Flex-grow: 0", 90),
         ("shrink", "Flex-shrink: 1", 90),
         ("shrink-0", "Flex-shrink: 0", 90),
-        ("grid-cols-1", "Grid template columns: repeat(1, minmax(0, 1fr))", 85),
-        ("grid-cols-2", "Grid template columns: repeat(2, minmax(0, 1fr))", 85),
-        ("grid-cols-3", "Grid template columns: repeat(3, minmax(0, 1fr))", 85),
-        ("grid-cols-4", "Grid template columns: repeat(4, minmax(0, 1fr))", 85),
-        ("grid-cols-6", "Grid template columns: repeat(6, minmax(0, 1fr))", 85),
-        ("grid-cols-12", "Grid template columns: repeat(12, minmax(0, 1fr))", 85),
+        (
+            "grid-cols-1",
+            "Grid template columns: repeat(1, minmax(0, 1fr))",
+            85,
+        ),
+        (
+            "grid-cols-2",
+            "Grid template columns: repeat(2, minmax(0, 1fr))",
+            85,
+        ),
+        (
+            "grid-cols-3",
+            "Grid template columns: repeat(3, minmax(0, 1fr))",
+            85,
+        ),
+        (
+            "grid-cols-4",
+            "Grid template columns: repeat(4, minmax(0, 1fr))",
+            85,
+        ),
+        (
+            "grid-cols-6",
+            "Grid template columns: repeat(6, minmax(0, 1fr))",
+            85,
+        ),
+        (
+            "grid-cols-12",
+            "Grid template columns: repeat(12, minmax(0, 1fr))",
+            85,
+        ),
         ("col-span-1", "Grid column: span 1", 85),
         ("col-span-2", "Grid column: span 2", 85),
         ("col-span-full", "Grid column: 1 / -1", 85),
@@ -332,7 +356,8 @@ impl TailwindWatcher {
         let mut watcher: RecommendedWatcher = Watcher::new(tx, config)
             .map_err(|e| format!("Failed to create Tailwind watcher: {}", e))?;
 
-        watcher.watch(Path::new(root), RecursiveMode::Recursive)
+        watcher
+            .watch(Path::new(root), RecursiveMode::Recursive)
             .map_err(|e| format!("Failed to watch directory: {}", e))?;
 
         TAILWIND_WATCHER_ACTIVE.store(true, Ordering::SeqCst);

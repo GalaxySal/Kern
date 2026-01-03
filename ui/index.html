@@ -490,7 +490,7 @@
           <!-- Left Section -->
           <div class="flex items-center h-full space-x-4">
             <div class="flex items-center space-x-1 hover:bg-[#ffffff20] px-1 h-full cursor-pointer" title="Git Branch">
-              <span class="icon-git-branch">master*</span>
+              <span class="icon-git-branch" id="git-branch">master*</span>
             </div>
             <div class="flex items-center space-x-1 px-1 h-full cursor-pointer hover:bg-[#ffffff20]"
               id="toggle-vibe-btn" title="Toggle Vibe AI">
@@ -503,6 +503,10 @@
               </div>
               <div class="flex items-center space-x-1">
                 <span class="text-white">⚠</span> <span id="status-warn-count">0</span>
+              </div>
+              <div class="flex items-center space-x-1 px-1 h-full cursor-pointer hover:bg-[#ffffff20]"
+                title="Current File">
+                <span id="file-name" class="opacity-90">Untitled</span>
               </div>
             </div>
           </div>
