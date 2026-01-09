@@ -50,6 +50,7 @@ commands.allow = [
     "apply_code_change",
     "sync_settings",
     "authenticate_github",
+    "authenticate_google",
     "start_lsp_server",
     "stop_lsp_server",
     "get_lsp_status",

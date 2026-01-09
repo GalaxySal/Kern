@@ -520,7 +520,7 @@ pub fn run() {
                     println!("macOS deep link event received: {:?}", urls);
                     for url in urls {
                         let url_str = url.to_string();
-                        if url_str.starts_with("kern://auth-callback") {
+                        if url_str.starts_with("kern://auth-callback") || url_str.starts_with("kern://google-auth-callback") {
                             let mut tx_guard = AUTH_TX.lock().unwrap();
                             if let Some(tx) = tx_guard.take() {
                                 let _ = tx.send(url_str);
@@ -533,7 +533,7 @@ pub fn run() {
             // Linux & Windows & macOS (First Instance): check argv manually for links
             // This catches the 'kern://...' link if the app was started BY the link.
             for arg in std::env::args() {
-                if arg.starts_with("kern://auth-callback") {
+                if arg.starts_with("kern://auth-callback") || arg.starts_with("kern://google-auth-callback") {
                     println!("Initial startup with deep link: {}", arg);
                     let mut tx_guard = AUTH_TX.lock().unwrap();
                     if let Some(tx) = tx_guard.take() {
@@ -588,6 +588,7 @@ pub fn run() {
             ai_client::apply_code_change,
             ai_client::sync_settings,
             authenticate_github,
+            authenticate_google,
             start_lsp_server,
             stop_lsp_server,
             get_lsp_status,
@@ -767,6 +768,132 @@ async fn authenticate_github(_app_handle: tauri::AppHandle) -> Result<AuthRespon
     Ok(AuthResponse {
         token: access_token,
         user: user_data,
+    })
+}
+
+#[tauri::command]
+async fn authenticate_google(_app_handle: tauri::AppHandle) -> Result<AuthResponse, String> {
+    use reqwest::Client;
+
+    let _ = dotenvy::dotenv();
+    println!("Starting Google authentication flow...");
+
+    // Load .env file manually if needed, though dotenvy::dotenv() at start should handle it.
+    // We check for specific error to guide the user.
+    let client_id = std::env::var("GOOGLE_CLIENT_ID").map_err(|_| {
+        "Missing GOOGLE_CLIENT_ID. Please add it to src-tauri/.env".to_string()
+    })?;
+    
+    let client_secret = std::env::var("GOOGLE_CLIENT_SECRET").map_err(|_| {
+        "Missing GOOGLE_CLIENT_SECRET. Please add it to src-tauri/.env".to_string()
+    })?;
+
+    if client_id.is_empty() || client_secret.is_empty() {
+        return Err("Google Credentials are empty in .env".to_string());
+    }
+
+    // Create a channel to receive the callback URL
+    let (tx, rx) = tokio::sync::oneshot::channel::<String>();
+    {
+        let mut tx_guard = AUTH_TX.lock().unwrap();
+        *tx_guard = Some(tx);
+    }
+
+    let state = uuid::Uuid::new_v4().to_string();
+    let redirect_uri = "kern://google-auth-callback";
+
+    let auth_url = format!(
+        "https://accounts.google.com/o/oauth2/v2/auth?client_id={}&redirect_uri={}&response_type=code&scope=email%20profile&state={}",
+        client_id,
+        urlencoding::encode(redirect_uri),
+        &state
+    );
+
+    println!("Opening Google auth URL: {}", auth_url);
+    shell_open(auth_url)?;
+
+    println!("Waiting for Google OAuth callback...");
+
+    // Wait for the callback with a timeout
+    let url_str = match tokio::time::timeout(std::time::Duration::from_secs(300), rx).await {
+        Ok(res) => {
+            let val = res.map_err(|_| "Failed to receive OAuth callback".to_string())?;
+            println!("Received callback URL: {}", val);
+            val
+        },
+        Err(_) => {
+            println!("Error: OAuth timeout reached");
+            let mut tx_guard = AUTH_TX.lock().unwrap();
+            *tx_guard = None;
+            return Err("OAuth timeout reached".to_string());
+        }
+    };
+
+    // Parse URL
+    let url = url::Url::parse(&url_str).map_err(|e| format!("Failed to parse callback URL: {}", e))?;
+    // Verify it is google callback
+    if url.domain() != Some("google-auth-callback") && !url_str.contains("google-auth-callback") {
+         // Note: parsing kern://google-auth-callback might put host as google-auth-callback
+         // or it might just be the path. 
+         // For now, accept it if it contains the keywords
+         println!("Warning: Callback URL might not match expected protocol: {}", url_str);
+    }
+
+    let code_pair = url.query_pairs().find(|(key, _)| key == "code");
+    let code = match code_pair {
+        Some((_, code)) => code.to_string(),
+        None => return Err("No OAuth code found in callback".to_string()),
+    };
+
+    println!("Exchanging code for token...");
+    let client = Client::new();
+    let params = format!(
+        "client_id={}&client_secret={}&code={}&grant_type=authorization_code&redirect_uri={}",
+        urlencoding::encode(&client_id),
+        urlencoding::encode(&client_secret),
+        urlencoding::encode(&code),
+        urlencoding::encode(redirect_uri)
+    );
+
+    let token_resp = client
+        .post("https://oauth2.googleapis.com/token")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(params)
+        .send()
+        .await
+        .map_err(|e: reqwest::Error| e.to_string())?;
+
+    let token_data: serde_json::Value = token_resp.json().await.map_err(|e: reqwest::Error| e.to_string())?;
+    
+    if let Some(error) = token_data.get("error") {
+        return Err(format!("Google OAuth Error: {}", error));
+    }
+
+    let access_token = token_data["access_token"]
+        .as_str()
+        .ok_or("No access token in response")?
+        .to_string();
+
+    println!("Fetching user info...");
+    let user_resp = client
+        .get("https://www.googleapis.com/oauth2/v2/userinfo")
+        .header("Authorization", format!("Bearer {}", access_token))
+        .send()
+        .await
+        .map_err(|e: reqwest::Error| e.to_string())?;
+
+    let user_data: serde_json::Value = user_resp.json().await.map_err(|e: reqwest::Error| e.to_string())?;
+    
+    let user = GitHubUser {
+        login: user_data["name"].as_str().unwrap_or("Google User").to_string(),
+        avatar_url: user_data["picture"].as_str().map(|s| s.to_string()),
+    };
+
+    println!("Google Auth successful for: {}", user.login);
+
+    Ok(AuthResponse {
+        token: access_token,
+        user,
     })
 }
 

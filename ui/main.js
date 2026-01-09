@@ -78,39 +78,44 @@ editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => saveFile())
 // Git Branch Management
 let gitPanel = null;
 
-function updateGitBranch() {
-    if (!currentProjectRoot) return;
+async function updateGitBranch() {
+    const branchElement = document.getElementById('git-branch');
+    if (!currentProjectRoot) {
+        if (branchElement) {
+            branchElement.textContent = '';
+            branchElement.className = '';
+        }
+        return;
+    }
 
-    invoke('git_status', { repoPath: currentProjectRoot })
-        .then(status => {
-            const branchElement = document.getElementById('git-branch');
-            if (branchElement) {
-                const branchName = status.branch || 'Not a git repository';
-                const dirtyIndicator = status.is_dirty ? '*' : '';
-                branchElement.textContent = status.branch ? `${status.branch}${dirtyIndicator}` : branchName;
-                branchElement.className = status.branch ? 'text-white' : 'text-gray-400 opacity-70';
+    try {
+        const status = await invoke('git_status', { repoPath: currentProjectRoot });
+        if (branchElement) {
+            const branchName = status.branch || '';
+            const dirtyIndicator = status.is_dirty ? '*' : '';
+            branchElement.textContent = status.branch ? `${status.branch}${dirtyIndicator}` : '';
+            branchElement.className = status.branch ? 'text-white' : 'text-gray-400 opacity-70';
 
-                // Update document title with branch name if in a git repo
-                if (status.branch && currentFilePath) {
-                    const fileName = currentFilePath.split('/').pop();
-                    document.title = `${fileName} (${status.branch}${dirtyIndicator}) - Kern Editor`;
-                }
+            // Update document title with branch name if in a git repo
+            if (status.branch && currentFilePath) {
+                const fileName = currentFilePath.split('/').pop();
+                document.title = `${fileName} (${status.branch}${dirtyIndicator}) - Kern Editor`;
             }
+        }
 
-            // Initialize Git panel if not already done
-            if (!gitPanel) {
-                gitPanel = new GitPanel();
-                setupGitMenu();
-            }
-        })
-        .catch(err => {
-            console.error('Git status error:', err);
-            const branchElement = document.getElementById('git-branch');
-            if (branchElement) {
-                branchElement.textContent = 'Not a git repository';
-                branchElement.className = 'text-gray-400 opacity-70';
-            }
-        });
+        // Initialize Git panel if not already done
+        if (!gitPanel) {
+            gitPanel = new GitPanel();
+            gitPanel.setPath(currentProjectRoot);
+            setupGitMenu();
+        }
+    } catch (e) {
+        // Not a git repo or error
+        if (branchElement) {
+            branchElement.textContent = '';
+            branchElement.className = '';
+        }
+    }
 }
 
 // Setup Git menu
@@ -232,138 +237,85 @@ async function updateEditor(content, path, filename) {
     }
 }
 
-async function openDirectory() {
+async function openProjectDialog() {
     try {
-        // For VS Code-like behavior, try directory picker first
-        console.log('Trying directory picker for VS Code-like experience...');
-        const selectedDir = await open({
-            directory: true,
-            multiple: false
-        });
-
-        console.log('Directory picker result:', selectedDir);
-
-        const selectedDirPath = Array.isArray(selectedDir) ? selectedDir[0] : selectedDir;
-
-        // If directory picker works (returns any valid path)
-        if (selectedDirPath && selectedDirPath !== '') {
-            console.log('✅ Directory picker worked! Opening:', selectedDirPath);
-
-            try {
-                const root = await invoke('open_project', { root: selectedDirPath });
-                console.log('open_project returned for directory:', root);
-                console.log('Project root path:', root.path);
-
-                currentProjectRoot = root.path;
-                renderTree(root.children, fileTreeEl);
-
-                // Update status bar
-                if (statusName) {
-                    statusName.textContent = selectedDirPath.split('/').pop();
-                }
-
-                // Update git branch and refresh Git panel
-                await updateGitBranch();
-
-                // Initialize Git panel if it doesn't exist
-                if (!gitPanel) {
-                    gitPanel = new GitPanel();
-                    gitPanel.setPath(currentProjectRoot);
-                    setupGitMenu();
-                } else {
-                    gitPanel.setPath(currentProjectRoot);
-                    gitPanel.refresh();
-                }
-
-                console.log('✅ Project opened successfully:', selectedDirPath);
-                return; // Exit after successful directory open
-            } catch (e) {
-                console.error('Error opening directory directly:', e);
-                // If it's a restricted directory error, alert the user prominently
-                if (typeof e === 'string' && e.includes('Restricted directory')) {
-                    alert('Security Restriction: ' + e);
-                    return;
-                }
-                // Fall through to file-based method for other errors
-            }
-        }
-
-        // Fallback to file-based method if directory open fails
-        const useFileMethod = confirm(`📁 Open Project Folder
-
-VS Code allows opening folders directly, but this system's folder picker has limitations.
-
-Current options:
-• Select ANY FILE from the desired folder (works for empty folders too)
-• Or enter folder path manually
-
-Select a file from your project folder?`);
+        const useFileMethod = navigator.userAgent.includes('Linux') || navigator.userAgent.includes('Windows');
 
         if (useFileMethod) {
-            // File-based approach (works for empty folders)
-            alert('Select any file from the project folder you want to open.\n\nFor empty folders: create a temporary file first, or use manual path entry.');
-
+            // File-based approach (fallback)
             const selectedFile = await open({
+                multiple: false,
+                defaultPath: await invoke('get_home_dir'),
+                title: 'Select a file in the project folder'
+            });
+
+            if (selectedFile) {
+                let filePath = null;
+                if (Array.isArray(selectedFile) && selectedFile.length > 0) filePath = selectedFile[0];
+                else if (typeof selectedFile === 'string') filePath = selectedFile;
+
+                if (filePath) {
+                    const dirPath = filePath.substring(0, filePath.lastIndexOf(filePath.includes('\\') ? '\\' : '/'));
+
+                    if (dirPath === '' || dirPath === '/' || dirPath.match(/^[a-zA-Z]:\\$/)) {
+                        alert('❌ Please select a file inside a project folder, not root.');
+                        return;
+                    }
+
+                    await loadProject(dirPath);
+                }
+            }
+        } else {
+            // Directory selection
+            const selectedDir = await open({
+                directory: true,
                 multiple: false,
                 defaultPath: await invoke('get_home_dir')
             });
 
-            if (selectedFile && selectedFile.length > 0) {
-                const filePath = selectedFile[0];
-                const dirPath = filePath.substring(0, filePath.lastIndexOf('/'));
-
-                console.log('Selected file:', filePath);
-                console.log('Extracted directory:', dirPath);
-
-                if (dirPath === '' || dirPath === '/') {
-                    alert('❌ Cannot open system directories.\n\nPlease select a file in your user directory.');
-                    return;
-                }
-
-                console.log('Calling open_project with file-based path:', dirPath);
-                const root = await invoke('open_project', { root: dirPath });
-                console.log('open_project returned for file-based:', root);
-                console.log('Project root path:', root.path);
-
-                currentProjectRoot = root.path;
-                renderTree(root.children, fileTreeEl);
-                console.log('✅ Project opened successfully:', dirPath);
-            }
-        } else {
-            // Manual path entry (for advanced users)
-            const manualPath = prompt('Enter project folder path manually:', await invoke('get_home_dir'));
-            if (manualPath && manualPath.trim()) {
-                try {
-                    console.log('Calling open_project with manual path:', manualPath.trim());
-                    const root = await invoke('open_project', { root: manualPath.trim() });
-                    console.log('open_project returned for manual path:', root);
-                    console.log('Project root path:', root.path);
-
-                    currentProjectRoot = root.path;
-                    currentProjectRoot = root.path;
-                    renderTree(root.children, fileTreeEl);
-
-                    // Update Git Panel
-                    await updateGitBranch();
-                    if (!gitPanel) {
-                        gitPanel = new GitPanel();
-                        gitPanel.setPath(currentProjectRoot);
-                        setupGitMenu();
-                    } else {
-                        gitPanel.setPath(currentProjectRoot);
-                        gitPanel.refresh();
-                    }
-
-                    console.log('✅ Project opened manually:', manualPath.trim());
-                } catch (e) {
-                    alert('❌ Failed to open folder: ' + e);
-                }
+            if (selectedDir) {
+                await loadProject(selectedDir);
             }
         }
     } catch (e) {
-        if (!e.message?.includes('callback id')) {
+        if (!e.message?.includes('callback id') && !e.message?.includes('cancelled')) {
             console.warn('❌ Open folder failed:', e);
+            alert('Failed to open folder: ' + e);
         }
+    }
+}
+
+async function loadProject(path) {
+    try {
+        console.log('Loading project:', path);
+        const root = await invoke('open_project', { root: path });
+
+        currentProjectRoot = root.path;
+        renderTree(root.children, fileTreeEl);
+
+        // Update Recent Projects
+        let recent = JSON.parse(localStorage.getItem('recent_projects') || '[]');
+        if (!Array.isArray(recent)) recent = [];
+        recent = recent.filter(p => p !== path);
+        recent.unshift(path);
+        if (recent.length > 10) recent.pop();
+        localStorage.setItem('recent_projects', JSON.stringify(recent));
+
+        // Update Git Panel
+        await updateGitBranch();
+        if (!gitPanel) {
+            gitPanel = new GitPanel();
+            gitPanel.setPath(currentProjectRoot);
+            setupGitMenu();
+        } else {
+            gitPanel.setPath(currentProjectRoot);
+            gitPanel.refresh();
+        }
+
+        console.log('✅ Project loaded:', path);
+    } catch (e) {
+        console.error('Failed to load project:', e);
+        throw e;
     }
 }
 
@@ -391,7 +343,7 @@ function renderTree(entries, parentElement, depth = 0) {
                         const sub = document.createElement('div');
                         sub.className = 'sub-folder';
                         div.after(sub);
-                        const updated = await invoke('readDir', { path: entry.path });
+                        const updated = await invoke('read_dir', { path: entry.path });
                         console.log('Read directory result:', updated);
                         renderTree(updated, sub, depth + 1);
                     } else {
@@ -440,7 +392,7 @@ if (explorerToggleBtn) {
     });
 }
 
-openDirBtn.addEventListener('click', openDirectory);
+openDirBtn.addEventListener('click', openProjectDialog);
 
 // Menu Event Handlers
 document.getElementById('action-open-file')?.addEventListener('click', async () => {
@@ -471,7 +423,7 @@ document.getElementById('action-new-file')?.addEventListener('click', () => {
     }
 });
 
-document.getElementById('action-open-folder')?.addEventListener('click', openDirectory);
+document.getElementById('action-open-folder')?.addEventListener('click', openProjectDialog);
 
 document.getElementById('action-exit')?.addEventListener('click', () => {
     if (confirm('Are you sure you want to exit?')) {
@@ -1168,5 +1120,64 @@ async function bootstrap() {
 
     vibe.initVibe(appState);
     settings.initSettings(appState);
+
+    // Setup Wizard Logic
+    checkSetupWizard();
 }
 bootstrap();
+
+function checkSetupWizard() {
+    // Check if setup is complete
+    if (!localStorage.getItem('kern_setup_complete')) {
+        const overlay = document.getElementById('wizard-overlay');
+        const frame = document.getElementById('wizard-frame');
+
+        if (overlay && frame) {
+            frame.src = 'wizard.html';
+            overlay.classList.remove('hidden');
+
+            // Listen for messages from wizard
+            window.addEventListener('message', async (event) => {
+                const { type, action } = event.data;
+
+                if (type === 'WIZARD_COMPLETE') {
+                    localStorage.setItem('kern_setup_complete', 'true');
+                    overlay.classList.add('hidden');
+                    frame.src = ''; // Clear iframe
+
+                    if (action === 'open') {
+                        openProjectDialog();
+                    } else if (action === 'clone') {
+                        // TODO: Implement clone dialog or open terminal with git clone hint
+                        invoke('spawn_terminal'); // Open terminal as a start
+                    }
+                } else if (type === 'WIZARD_AUTH_GITHUB') {
+                    // Reuse GitPanel logic if possible, or direct invoke
+                    try {
+                        // Ensure GitPanel is initialized to handle the state
+                        if (!gitPanel) {
+                            gitPanel = new GitPanel();
+                        }
+                        await gitPanel.handleSignIn();
+                        // Verify if auth was successful (gitPanel state or localStorage)
+                        // gitPanel.handleSignIn is async and handles the UI update
+
+                        // Optional: Notify wizard of success to change button state?
+                        // For now, allow the user to click Next manually
+                    } catch (e) {
+                        console.error('Wizard Auth Failed:', e);
+                    }
+                } else if (type === 'WIZARD_AUTH_GOOGLE') {
+                    try {
+                        if (!gitPanel) {
+                            gitPanel = new GitPanel();
+                        }
+                        await gitPanel.handleGoogleSignIn();
+                    } catch (e) {
+                        console.error('Wizard Google Auth Failed:', e);
+                    }
+                }
+            });
+        }
+    }
+}

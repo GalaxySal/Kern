@@ -26,6 +26,7 @@ export class GitPanel {
       staged: document.getElementById('staged-files'),
       unstaged: document.getElementById('unstaged-files'),
       signInBtn: document.getElementById('github-signin'),
+      googleSignInBtn: document.getElementById('google-signin'),
       signOutBtn: document.getElementById('github-signout'),
       userDiv: document.getElementById('github-user'),
       avatar: document.getElementById('github-avatar'),
@@ -38,6 +39,9 @@ export class GitPanel {
   async init() {
     console.log('Initializing GitPanel...');
     this.bindEvents();
+    if (this.els.googleSignInBtn) {
+      this.els.googleSignInBtn.addEventListener('click', () => this.handleGoogleSignIn());
+    }
     this.updateGitHubUI();
     this.setupOAuthHandlers();
 
@@ -54,13 +58,7 @@ export class GitPanel {
   }
 
   bindEvents() {
-    this.els.toggleBtn?.addEventListener('click', () => {
-      this.els.panel?.classList.toggle('hidden');
-      if (this.els.panel && !this.els.panel.classList.contains('hidden')) {
-        this.refreshGitStatus();
-        this.updateGitHubUI(); // Ensure auth UI is correct
-      }
-    });
+    // this.els.toggleBtn listener removed to avoid conflict with main.js layout management
 
     this.els.refreshBtn?.addEventListener('click', () => this.refreshGitStatus());
 
@@ -89,7 +87,22 @@ export class GitPanel {
       this.updateGitUI(status);
     } catch (error) {
       console.warn('Git status error:', error);
-      this.showError('Not a git repository or error fetching status');
+      // Don't just show error, update UI to reflect "No Repo" state so panel stays valid
+      this.updateGitUI({
+        is_dirty: false,
+        branch: 'No Repo',
+        ahead: 0,
+        behind: 0,
+        staged_files: [],
+        modified_files: [],
+        untracked_files: []
+      });
+      // Show error but less aggressively if it's just "not a git repo"
+      if (typeof error === 'string' && error.includes('Not a git repository')) {
+        this.showError('Not a git repository');
+      } else {
+        this.showError('Git Error: ' + error);
+      }
     }
   }
 
@@ -200,11 +213,13 @@ export class GitPanel {
     if (this.githubUser) {
       this.els.userDiv?.classList.remove('hidden');
       this.els.signInBtn?.classList.add('hidden');
+      this.els.googleSignInBtn?.classList.add('hidden');
       if (this.els.avatar) this.els.avatar.src = this.githubUser.avatar_url || '';
       if (this.els.username) this.els.username.textContent = this.githubUser.login;
     } else {
       this.els.userDiv?.classList.add('hidden');
       this.els.signInBtn?.classList.remove('hidden');
+      this.els.googleSignInBtn?.classList.remove('hidden');
     }
   }
 
@@ -227,6 +242,24 @@ export class GitPanel {
     } catch (error) {
       console.error('[GitPanel] handleSignIn: Error:', error);
       this.showError('Authentication failed: ' + error);
+    }
+  }
+
+  async handleGoogleSignIn() {
+    try {
+      console.log('[GitPanel] handleGoogleSignIn: Starting Google authentication...');
+      this.showMessage('Starting Google authentication...');
+      const response = await invoke('authenticate_google');
+      console.log('[GitPanel] handleGoogleSignIn: Backend response:', response);
+      if (response && response.token) {
+        await this.handleNewToken(response.token, response.user);
+      } else {
+        console.warn('[GitPanel] handleGoogleSignIn: Response missing token:', response);
+        this.showError('Auth failed: No token received');
+      }
+    } catch (error) {
+      console.error('[GitPanel] handleGoogleSignIn: Error:', error);
+      this.showError('Auth failed: ' + error);
     }
   }
 

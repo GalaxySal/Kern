@@ -68,11 +68,11 @@ export async function showAboutDialog() {
                     <div style="margin-bottom: 20px; color: black;">
                         <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee;">
                             <span style="font-weight: 500;">KERN Version</span>
-                            <span>0.1.2</span>
+                            <span>0.1.3</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee;">
                             <span style="font-weight: 500;">Date</span>
-                            <span>2026-01-03</span>
+                            <span>2026-01-08</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee;">
                             <span style="font-weight: 500;">Tauri</span>
