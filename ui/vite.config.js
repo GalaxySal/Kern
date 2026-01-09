@@ -28,7 +28,8 @@ export default defineConfig(({ mode: _mode }) => ({
         rollupOptions: {
             input: {
                 main: resolve(__dirname, 'index.html'),
-                about: resolve(__dirname, 'about-dialog.html')
+                about: resolve(__dirname, 'about-dialog.html'),
+                wizard: resolve(__dirname, 'wizard.html')
             },
             // Externalize Tauri imports
             external: [],
