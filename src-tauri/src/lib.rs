@@ -520,7 +520,9 @@ pub fn run() {
                     println!("macOS deep link event received: {:?}", urls);
                     for url in urls {
                         let url_str = url.to_string();
-                        if url_str.starts_with("kern://auth-callback") || url_str.starts_with("kern://google-auth-callback") {
+                        if url_str.starts_with("kern://auth-callback")
+                            || url_str.starts_with("kern://google-auth-callback")
+                        {
                             let mut tx_guard = AUTH_TX.lock().unwrap();
                             if let Some(tx) = tx_guard.take() {
                                 let _ = tx.send(url_str);
@@ -533,7 +535,9 @@ pub fn run() {
             // Linux & Windows & macOS (First Instance): check argv manually for links
             // This catches the 'kern://...' link if the app was started BY the link.
             for arg in std::env::args() {
-                if arg.starts_with("kern://auth-callback") || arg.starts_with("kern://google-auth-callback") {
+                if arg.starts_with("kern://auth-callback")
+                    || arg.starts_with("kern://google-auth-callback")
+                {
                     println!("Initial startup with deep link: {}", arg);
                     let mut tx_guard = AUTH_TX.lock().unwrap();
                     if let Some(tx) = tx_guard.take() {
@@ -780,13 +784,11 @@ async fn authenticate_google(_app_handle: tauri::AppHandle) -> Result<AuthRespon
 
     // Load .env file manually if needed, though dotenvy::dotenv() at start should handle it.
     // We check for specific error to guide the user.
-    let client_id = std::env::var("GOOGLE_CLIENT_ID").map_err(|_| {
-        "Missing GOOGLE_CLIENT_ID. Please add it to src-tauri/.env".to_string()
-    })?;
-    
-    let client_secret = std::env::var("GOOGLE_CLIENT_SECRET").map_err(|_| {
-        "Missing GOOGLE_CLIENT_SECRET. Please add it to src-tauri/.env".to_string()
-    })?;
+    let client_id = std::env::var("GOOGLE_CLIENT_ID")
+        .map_err(|_| "Missing GOOGLE_CLIENT_ID. Please add it to src-tauri/.env".to_string())?;
+
+    let client_secret = std::env::var("GOOGLE_CLIENT_SECRET")
+        .map_err(|_| "Missing GOOGLE_CLIENT_SECRET. Please add it to src-tauri/.env".to_string())?;
 
     if client_id.is_empty() || client_secret.is_empty() {
         return Err("Google Credentials are empty in .env".to_string());
@@ -820,7 +822,7 @@ async fn authenticate_google(_app_handle: tauri::AppHandle) -> Result<AuthRespon
             let val = res.map_err(|_| "Failed to receive OAuth callback".to_string())?;
             println!("Received callback URL: {}", val);
             val
-        },
+        }
         Err(_) => {
             println!("Error: OAuth timeout reached");
             let mut tx_guard = AUTH_TX.lock().unwrap();
@@ -830,13 +832,17 @@ async fn authenticate_google(_app_handle: tauri::AppHandle) -> Result<AuthRespon
     };
 
     // Parse URL
-    let url = url::Url::parse(&url_str).map_err(|e| format!("Failed to parse callback URL: {}", e))?;
+    let url =
+        url::Url::parse(&url_str).map_err(|e| format!("Failed to parse callback URL: {}", e))?;
     // Verify it is google callback
     if url.domain() != Some("google-auth-callback") && !url_str.contains("google-auth-callback") {
-         // Note: parsing kern://google-auth-callback might put host as google-auth-callback
-         // or it might just be the path. 
-         // For now, accept it if it contains the keywords
-         println!("Warning: Callback URL might not match expected protocol: {}", url_str);
+        // Note: parsing kern://google-auth-callback might put host as google-auth-callback
+        // or it might just be the path.
+        // For now, accept it if it contains the keywords
+        println!(
+            "Warning: Callback URL might not match expected protocol: {}",
+            url_str
+        );
     }
 
     let code_pair = url.query_pairs().find(|(key, _)| key == "code");
@@ -863,8 +869,11 @@ async fn authenticate_google(_app_handle: tauri::AppHandle) -> Result<AuthRespon
         .await
         .map_err(|e: reqwest::Error| e.to_string())?;
 
-    let token_data: serde_json::Value = token_resp.json().await.map_err(|e: reqwest::Error| e.to_string())?;
-    
+    let token_data: serde_json::Value = token_resp
+        .json()
+        .await
+        .map_err(|e: reqwest::Error| e.to_string())?;
+
     if let Some(error) = token_data.get("error") {
         return Err(format!("Google OAuth Error: {}", error));
     }
@@ -882,10 +891,16 @@ async fn authenticate_google(_app_handle: tauri::AppHandle) -> Result<AuthRespon
         .await
         .map_err(|e: reqwest::Error| e.to_string())?;
 
-    let user_data: serde_json::Value = user_resp.json().await.map_err(|e: reqwest::Error| e.to_string())?;
-    
+    let user_data: serde_json::Value = user_resp
+        .json()
+        .await
+        .map_err(|e: reqwest::Error| e.to_string())?;
+
     let user = GitHubUser {
-        login: user_data["name"].as_str().unwrap_or("Google User").to_string(),
+        login: user_data["name"]
+            .as_str()
+            .unwrap_or("Google User")
+            .to_string(),
         avatar_url: user_data["picture"].as_str().map(|s| s.to_string()),
     };
 
