@@ -6,7 +6,6 @@ fn main() {
     // SAFETY: Program başlangıç anında tek thread çalışır, güvenlidir.
     unsafe {
         std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
         std::env::set_var("WEBKIT_FORCE_SANDBOX", "0");
     }
 
