@@ -88,7 +88,7 @@
                     A new home for your development workflow. <br>
                     Fast, personalized, and built for the modern era.
                 </p>
-                <button onclick="nextStep()"
+                <button id="btn-start"
                     class="bg-[#3b8eea] hover:bg-[#327ac6] text-white px-8 py-3 rounded-md font-medium transition-colors">
                     Start Setup
                 </button>
@@ -101,7 +101,7 @@
 
                 <div class="flex gap-6 mb-10">
                     <div class="flex flex-col items-center gap-3">
-                        <div class="theme-preview bg-[#1e1e1e] selected" onclick="selectTheme('dark', this)">
+                        <div class="theme-preview bg-[#1e1e1e] selected" id="theme-dark">
                             <!-- Abstract dark UI rep -->
                             <div class="absolute top-2 left-2 right-2 h-2 bg-[#333] rounded-sm"></div>
                             <div class="absolute top-6 left-2 bottom-2 width-1/3 bg-[#252526] rounded-sm w-8"></div>
@@ -109,7 +109,7 @@
                         <span class="text-sm font-medium">Dark Modern</span>
                     </div>
                     <div class="flex flex-col items-center gap-3">
-                        <div class="theme-preview bg-[#ffffff]" onclick="selectTheme('light', this)">
+                        <div class="theme-preview bg-[#ffffff]" id="theme-light">
                             <!-- Abstract light UI rep -->
                             <div class="absolute top-2 left-2 right-2 h-2 bg-[#e5e5e5] rounded-sm"></div>
                             <div class="absolute top-6 left-2 bottom-2 width-1/3 bg-[#f3f3f3] rounded-sm w-8"></div>
@@ -119,9 +119,9 @@
                 </div>
 
                 <div class="flex gap-4">
-                    <button onclick="nextStep()"
+                    <button id="btn-step2-next"
                         class="bg-[#3b8eea] hover:bg-[#327ac6] text-white px-6 py-2 rounded-md transition-colors">Next</button>
-                    <button onclick="prevStep()" class="text-[#cccccc] hover:text-white px-4 py-2">Back</button>
+                    <button id="btn-step2-back" class="text-[#cccccc] hover:text-white px-4 py-2">Back</button>
                 </div>
             </div>
 
@@ -145,12 +145,12 @@
                         </svg>
                         Sign in with Google
                     </button>
-                    <button onclick="nextStep()" class="text-sm text-[#3b8eea] hover:underline mt-2">Skip for
+                    <button id="btn-step3-skip" class="text-sm text-[#3b8eea] hover:underline mt-2">Skip for
                         now</button>
                 </div>
 
                 <div class="flex gap-4">
-                    <button onclick="prevStep()" class="text-[#cccccc] hover:text-white px-4 py-2">Back</button>
+                    <button id="btn-step3-back" class="text-[#cccccc] hover:text-white px-4 py-2">Back</button>
                 </div>
             </div>
 
@@ -160,7 +160,7 @@
                 <p class="text-[#999999] mb-10">Kern is ready to use.</p>
 
                 <div class="flex gap-4 flex-col w-full max-w-sm">
-                    <button onclick="finishSetup('open')"
+                    <button id="btn-finish-open"
                         class="bg-[#3e3e42] hover:bg-[#4e4e52] text-white p-4 rounded-lg flex items-center gap-4 transition-colors text-left group">
                         <span
                             class="bg-[#3b8eea] p-2 rounded text-white group-hover:scale-110 transition-transform">📂</span>
@@ -170,7 +170,7 @@
                         </div>
                     </button>
 
-                    <button onclick="finishSetup('clone')"
+                    <button id="btn-finish-clone"
                         class="bg-[#3e3e42] hover:bg-[#4e4e52] text-white p-4 rounded-lg flex items-center gap-4 transition-colors text-left group">
                         <span
                             class="bg-[#23d18b] p-2 rounded text-white group-hover:scale-110 transition-transform">⚡</span>
@@ -180,7 +180,7 @@
                         </div>
                     </button>
 
-                    <button onclick="finishSetup('empty')" class="text-gray-500 hover:text-gray-300 text-sm mt-4">Just
+                    <button id="btn-finish-empty" class="text-gray-500 hover:text-gray-300 text-sm mt-4">Just
                         open the editor</button>
                 </div>
             </div>
@@ -192,10 +192,10 @@
         let currentStep = 1;
         const totalSteps = 4;
 
-        // Expose to parent window if inside iframe, or usage directly
-        window.nextStep = () => setStep(currentStep + 1);
-        window.prevStep = () => setStep(currentStep - 1);
-        window.setStep = (step) => {
+        // Navigation Functions
+        const nextStep = () => setStep(currentStep + 1);
+        const prevStep = () => setStep(currentStep - 1);
+        const setStep = (step) => {
             if (step < 1 || step > totalSteps) return;
 
             // Update UI
@@ -217,13 +217,13 @@
             currentStep = step;
         };
 
-        window.selectTheme = (theme, el) => {
+        const selectTheme = (theme, el) => {
             document.querySelectorAll('.theme-preview').forEach(e => e.classList.remove('selected'));
             el.classList.add('selected');
             // Logic to save theme preference would go here
         };
 
-        window.finishSetup = (action) => {
+        const finishSetup = (action) => {
             // Communicate back to main process
             if (window.parent && window.parent.postMessage) {
                 window.parent.postMessage({ type: 'WIZARD_COMPLETE', action }, '*');
@@ -232,12 +232,33 @@
             }
         };
 
-        // GitHub Auth Click Handler (Intercepted by main.js if iframe, or handle directly)
-        document.getElementById('wizard-github-btn').onclick = () => {
-            if (window.parent && window.parent.postMessage) {
-                window.parent.postMessage({ type: 'WIZARD_AUTH_GITHUB' }, '*');
-            }
-        };
+        // Event Listeners (Safer for Production Bundles)
+        document.addEventListener('DOMContentLoaded', () => {
+            // Step 1
+            document.getElementById('btn-start')?.addEventListener('click', nextStep);
+            
+            // Step 2
+            document.getElementById('btn-step2-next')?.addEventListener('click', nextStep);
+            document.getElementById('btn-step2-back')?.addEventListener('click', prevStep);
+            document.getElementById('theme-dark')?.addEventListener('click', function() { selectTheme('dark', this) });
+            document.getElementById('theme-light')?.addEventListener('click', function() { selectTheme('light', this) });
+
+            // Step 3
+            document.getElementById('btn-step3-skip')?.addEventListener('click', nextStep);
+            document.getElementById('btn-step3-back')?.addEventListener('click', prevStep);
+            
+            // Step 4
+            document.getElementById('btn-finish-open')?.addEventListener('click', () => finishSetup('open'));
+            document.getElementById('btn-finish-clone')?.addEventListener('click', () => finishSetup('clone'));
+            document.getElementById('btn-finish-empty')?.addEventListener('click', () => finishSetup('empty'));
+
+            // GitHub Auth Click Handler
+            document.getElementById('wizard-github-btn').onclick = () => {
+                if (window.parent && window.parent.postMessage) {
+                    window.parent.postMessage({ type: 'WIZARD_AUTH_GITHUB' }, '*');
+                }
+            };
+        });
     </script>
 </body>
 
