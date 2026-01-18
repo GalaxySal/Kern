@@ -19,7 +19,7 @@
   "description": "Kern is a high-performance, ultra-lightweight code editor built with **Rust**, **Tauri 2.0**, and **Monaco Editor**. It combines the power of native speed with the flexibility of modern web technologies to provide a premium development experience.",
   "main": "index.js",
   "dependencies": {
-    "@tauri-apps/plugin-dialog": "^2.4.2",
+    "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-fs": "^2.4.4",
     "@tauri-apps/plugin-os": "^2.3.2",
     "@tauri-apps/plugin-shell": "^2.3.3",
