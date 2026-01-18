@@ -465,6 +465,33 @@ fn resize_terminal(rows: u16, cols: u16, state: State<AppState>) -> Result<(), S
     Ok(())
 }
 
+// i18n commands
+#[tauri::command]
+async fn get_locale() -> Result<String, String> {
+    // Try to get system locale, fallback to English
+    let locale = sys_locale::get_locale().unwrap_or_else(|| "en".to_string());
+    // Extract just the language part (e.g., "en-US" -> "en")
+    let lang = locale.split('-').next().unwrap_or("en");
+    Ok(lang.to_string())
+}
+
+#[tauri::command]
+async fn load_translations(locale: String) -> Result<serde_json::Value, String> {
+    let file_path = format!("src-tauri/locales/{}.json", locale);
+    let content = std::fs::read_to_string(&file_path)
+        .map_err(|e| format!("Failed to read translation file: {}", e))?;
+    let translations: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse translation file: {}", e))?;
+    Ok(translations)
+}
+
+#[tauri::command]
+async fn set_locale(locale: String) -> Result<String, String> {
+    // In a real implementation, you might want to store this preference
+    // For now, just return the locale as confirmation
+    Ok(locale)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
@@ -596,7 +623,10 @@ pub fn run() {
             start_lsp_server,
             stop_lsp_server,
             get_lsp_status,
-            restart_lsp_server
+            restart_lsp_server,
+            get_locale,
+            load_translations,
+            set_locale
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

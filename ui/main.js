@@ -1,6 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
+// Import i18n
+import { initI18n, t } from './src/i18n.js';
+import './src/language-switcher.js';
 
 import { open } from '@tauri-apps/plugin-dialog';
 // import { showAboutDialog } from './src/about.js';
@@ -58,6 +61,9 @@ let currentProjectRoot = null;
 // Initialize Simple LSP Client
 const lspClient = new SimpleLSPClient();
 
+// Initialize i18n
+let i18nReady = false;
+
 // Initialize Editor
 const editor = monaco.editor.create(container, {
     value: '// Welcome to Kern\n// Click "Open Folder" to start.',
@@ -68,6 +74,71 @@ const editor = monaco.editor.create(container, {
     fontSize: 13,
     minimap: { enabled: false }
 });
+
+// Initialize i18n and update UI
+async function initializeApp() {
+    try {
+        const locale = await initI18n();
+        i18nReady = true;
+        console.log(`i18n initialized with locale: ${locale}`);
+        updateUITranslations();
+    } catch (error) {
+        console.error('Failed to initialize i18n:', error);
+    }
+}
+
+// Update UI elements with translations
+function updateUITranslations() {
+    if (!i18nReady) return;
+    
+    // Update menu items
+    const menuItems = {
+        'menu-file': t('menu.file'),
+        'menu-edit': t('menu.edit'),
+        'menu-view': t('menu.view'),
+        'menu-terminal': t('menu.terminal'),
+        'menu-help': t('menu.help'),
+        'action-new-file': t('menu.new_file'),
+        'action-open-file': t('menu.open_file'),
+        'action-save-file': t('menu.save_file'),
+        'action-open-folder': t('menu.open_folder'),
+        'action-exit': t('menu.exit'),
+        'action-undo': t('menu.undo'),
+        'action-redo': t('menu.redo'),
+        'action-cut': t('menu.cut'),
+        'action-copy': t('menu.copy'),
+        'action-paste': t('menu.paste'),
+        'action-find': t('menu.find'),
+        'action-select-all': t('menu.select_all'),
+        'action-toggle-sidebar': t('menu.toggle_sidebar'),
+        'action-toggle-panel': t('menu.toggle_panel'),
+        'action-new-terminal': t('terminal.new_terminal'),
+        'action-split-terminal': t('terminal.split_terminal'),
+        'action-welcome': t('help.welcome'),
+        'action-about': t('help.about')
+    };
+    
+    Object.entries(menuItems).forEach(([id, text]) => {
+        const element = document.getElementById(id);
+        if (element) {
+            if (element.tagName === 'INPUT' && element.type === 'button') {
+                element.value = text;
+            } else {
+                element.textContent = text;
+            }
+        }
+    });
+    
+    // Update window title
+    document.title = t('app.name');
+}
+
+// Initialize app when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+    initializeApp();
+}
 
 editor.onDidChangeCursorPosition((e) => {
     statusCursor.innerText = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;

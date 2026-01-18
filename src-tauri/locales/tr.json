@@ -1,0 +1,111 @@
+{
+  "app": {
+    "name": "Kern Editör",
+    "description": "Modern bir kod editörü"
+  },
+  "menu": {
+    "file": "Dosya",
+    "edit": "Düzen",
+    "view": "Görünüm",
+    "terminal": "Terminal",
+    "help": "Yardım",
+    "new_file": "Yeni Metin Dosyası",
+    "open_file": "Dosya Aç...",
+    "save_file": "Kaydet",
+    "save_as": "Farklı Kaydet",
+    "close_file": "Dosyayı Kapat",
+    "open_folder": "Klasör Aç...",
+    "exit": "Çıkış",
+    "undo": "Geri Al",
+    "redo": "İleri Al",
+    "cut": "Kes",
+    "copy": "Kopyala",
+    "paste": "Yapıştır",
+    "find": "Bul",
+    "replace": "Değiştir",
+    "select_all": "Tümünü Seç",
+    "toggle_sidebar": "Kenar Çubuğu Aç/Kapat",
+    "toggle_panel": "Paneli Aç/Kapat",
+    "preferences": "Tercihler"
+  },
+  "window": {
+    "main": "Kern Editör",
+    "github_oauth": "GitHub ile Giriş Yap"
+  },
+  "dialog": {
+    "confirm": "Onayla",
+    "cancel": "İptal",
+    "ok": "Tamam",
+    "yes": "Evet",
+    "no": "Hayır",
+    "save_changes": "Değişiklikleri kaydetmek istiyor musunuz?",
+    "file_not_found": "Dosya bulunamadı",
+    "error": "Hata",
+    "warning": "Uyarı",
+    "info": "Bilgi"
+  },
+  "terminal": {
+    "new_terminal": "Yeni Terminal",
+    "split_terminal": "Terminali Böl",
+    "close_terminal": "Terminali Kapat",
+    "terminal_1": "Terminal 1",
+    "terminal_2": "Terminal 2"
+  },
+  "git": {
+    "clone": "Depoyu Klonla",
+    "commit": "Commit",
+    "push": "Push",
+    "pull": "Pull",
+    "branch": "Dal",
+    "merge": "Birleştir",
+    "status": "Durum",
+    "log": "Log",
+    "diff": "Diff"
+  },
+  "ai": {
+    "chat": "AI Sohbet",
+    "assistant": "AI Asistan",
+    "send_message": "Mesaj Gönder",
+    "thinking": "Düşünüyorum...",
+    "error": "AI Servis Hatası"
+  },
+  "extensions": {
+    "marketplace": "Eklenti Mağazası",
+    "install": "Yükle",
+    "uninstall": "Kaldır",
+    "enable": "Etkinleştir",
+    "disable": "Devre Dışı Bırak",
+    "update": "Güncelle",
+    "settings": "Ayarlar"
+  },
+  "lsp": {
+    "server_status": "LSP Sunucu Durumu",
+    "restart_server": "Sunucuyu Yeniden Başlat",
+    "start_server": "Sunucuyu Başlat",
+    "stop_server": "Sunucuyu Durdur",
+    "running": "Çalışıyor",
+    "stopped": "Durduruldu",
+    "error": "Hata"
+  },
+  "settings": {
+    "general": "Genel",
+    "editor": "Editör",
+    "theme": "Tema",
+    "font": "Yazı Tipi",
+    "keybindings": "Kısayol Tuşları",
+    "extensions": "Eklentiler",
+    "language": "Dil"
+  },
+  "status": {
+    "ready": "Hazır",
+    "loading": "Yükleniyor",
+    "saving": "Kaydediliyor",
+    "error": "Hata",
+    "connected": "Bağlandı",
+    "disconnected": "Bağlantı Kesildi"
+  },
+  "help": {
+    "welcome": "Hoş Geldiniz",
+    "about": "KERN Hakkında"
+  }
+}

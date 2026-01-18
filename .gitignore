@@ -17,7 +17,6 @@ pnpm-debug.log*
 # Rust
 /target/
 **/*.rs.bk
-Cargo.lock
 
 # Tauri
 src-tauri/target/

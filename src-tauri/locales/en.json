@@ -1,0 +1,111 @@
+{
+  "app": {
+    "name": "Kern Editor",
+    "description": "A modern code editor"
+  },
+  "menu": {
+    "file": "File",
+    "edit": "Edit",
+    "view": "View",
+    "terminal": "Terminal",
+    "help": "Help",
+    "new_file": "New Text File",
+    "open_file": "Open File...",
+    "save_file": "Save",
+    "save_as": "Save As",
+    "close_file": "Close File",
+    "open_folder": "Open Folder...",
+    "exit": "Exit",
+    "undo": "Undo",
+    "redo": "Redo",
+    "cut": "Cut",
+    "copy": "Copy",
+    "paste": "Paste",
+    "find": "Find",
+    "replace": "Replace",
+    "select_all": "Select All",
+    "toggle_sidebar": "Toggle Sidebar",
+    "toggle_panel": "Toggle Panel",
+    "preferences": "Preferences"
+  },
+  "window": {
+    "main": "Kern Editor",
+    "github_oauth": "Sign in with GitHub"
+  },
+  "dialog": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "ok": "OK",
+    "yes": "Yes",
+    "no": "No",
+    "save_changes": "Do you want to save changes?",
+    "file_not_found": "File not found",
+    "error": "Error",
+    "warning": "Warning",
+    "info": "Information"
+  },
+  "terminal": {
+    "new_terminal": "New Terminal",
+    "split_terminal": "Split Terminal",
+    "close_terminal": "Close Terminal",
+    "terminal_1": "Terminal 1",
+    "terminal_2": "Terminal 2"
+  },
+  "git": {
+    "clone": "Clone Repository",
+    "commit": "Commit",
+    "push": "Push",
+    "pull": "Pull",
+    "branch": "Branch",
+    "merge": "Merge",
+    "status": "Status",
+    "log": "Log",
+    "diff": "Diff"
+  },
+  "ai": {
+    "chat": "AI Chat",
+    "assistant": "AI Assistant",
+    "send_message": "Send Message",
+    "thinking": "Thinking...",
+    "error": "AI Service Error"
+  },
+  "extensions": {
+    "marketplace": "Extension Marketplace",
+    "install": "Install",
+    "uninstall": "Uninstall",
+    "enable": "Enable",
+    "disable": "Disable",
+    "update": "Update",
+    "settings": "Settings"
+  },
+  "lsp": {
+    "server_status": "LSP Server Status",
+    "restart_server": "Restart Server",
+    "start_server": "Start Server",
+    "stop_server": "Stop Server",
+    "running": "Running",
+    "stopped": "Stopped",
+    "error": "Error"
+  },
+  "settings": {
+    "general": "General",
+    "editor": "Editor",
+    "theme": "Theme",
+    "font": "Font",
+    "keybindings": "Keybindings",
+    "extensions": "Extensions",
+    "language": "Language"
+  },
+  "status": {
+    "ready": "Ready",
+    "loading": "Loading",
+    "saving": "Saving",
+    "error": "Error",
+    "connected": "Connected",
+    "disconnected": "Disconnected"
+  },
+  "help": {
+    "welcome": "Welcome",
+    "about": "About KERN"
+  }
+}

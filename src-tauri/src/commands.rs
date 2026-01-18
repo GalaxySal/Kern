@@ -1,4 +1,3 @@
-use std::process::Command;
 use tauri::command;
 
 #[command]
@@ -25,6 +24,7 @@ pub fn get_app_version() -> String {
 pub fn get_webview_version() -> String {
     #[cfg(target_os = "linux")]
     {
+        use std::process::Command;
         // Try to get WebKitGTK version via pkg-config
         let version_opt = Command::new("pkg-config")
             .args(["--modversion", "webkit2gtk-4.1"])

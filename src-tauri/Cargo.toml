@@ -13,6 +13,7 @@ portable-pty = "0.8"
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
+sys-locale = "0.3"
 
 # Phase 2: Advanced Features
 walkdir = "2"
@@ -48,7 +49,6 @@ tauri-plugin-mcp-bridge = "0.6.5"
 tauri-plugin-cors-fetch = "4"
 tauri-plugin-system-fonts = "2"
 tauri-plugin-google-auth = "0.3"
-tauri-plugin-i18n = "2"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
